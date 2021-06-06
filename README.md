@@ -1,4 +1,4 @@
-# GoShot
+# GoShot (**Work in Progress**)
 
 Convenient screenshot program that is quick, allows for very simple 
 editing (cropping, drawing arrows, circles and text boxes) and exports to 
