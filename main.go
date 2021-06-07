@@ -6,21 +6,24 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
 	"github.com/kbinani/screenshot"
 	"image/draw"
+	"time"
 )
 
 type GoShot struct {
 	App fyne.App
 	Win fyne.Window // Main window.
 
-	Screenshot draw.Image
+	Screenshot     draw.Image
+	ScreenshotTime time.Time
 }
 
 func main() {
 	gs := &GoShot{
-		App: app.New(),
+		App: app.NewWithID("GoShot"),
 	}
 	if err := gs.MakeScreenshot(); err != nil {
 		glog.Fatalf("Failed to capture screenshot: %s", err)
@@ -40,6 +43,7 @@ func (gs *GoShot) MakeScreenshot() error {
 	if err != nil {
 		return err
 	}
+	gs.ScreenshotTime = time.Now()
 
 	glog.Infof("Bounds: %+v\n", bounds)
 	return nil
@@ -53,10 +57,10 @@ func (gs *GoShot) MakeScreenshot() error {
 }
 
 func (gs *GoShot) BuildEditWindow() {
-	gs.Win = gs.App.NewWindow("Hello")
+	gs.Win = gs.App.NewWindow(fmt.Sprintf("GoShot: Screenshot at %s", gs.ScreenshotTime))
 
 	// Build menu.
-	menuFile := fyne.NewMenu("File")// fyne.NewMenuItem("Exit", func() { gsApp.Quit() } ),
+	menuFile := fyne.NewMenu("File") // fyne.NewMenuItem("Exit", func() { gsApp.Quit() } ),
 
 	menuShare := fyne.NewMenu("Share",
 		fyne.NewMenuItem("Copy (clipboard)", func() { copyImageToClipboard() }),
@@ -66,14 +70,27 @@ func (gs *GoShot) BuildEditWindow() {
 	gs.Win.SetMainMenu(mainMenu)
 
 	// Side toolbar.
+	toolBar := container.NewVBox(
+		widget.NewButton("Crop", nil),
+		widget.NewButton("Arrow", nil),
+		widget.NewButton("Circle", nil),
+		widget.NewButton("Text", nil),
+	)
 
 	// Image canvas.
 	canvasImg := canvas.NewImageFromImage(gs.Screenshot)
-	canvasImg.SetMinSize(fyne.NewSize(800.0, 600.0))
+	canvasImg.SetMinSize(fyne.NewSize(100.0, 100.0))
 	// Status bar.
 
 	// Stitch all together.
-	gs.Win.SetContent(container.NewMax(canvasImg))
+	split := container.NewHSplit(
+		container.NewMax(canvasImg),
+		toolBar,
+	)
+	split.Offset = 0.8
+
+	gs.Win.SetContent(split)
+	gs.Win.Resize(fyne.NewSize(800.0, 600.0))
 }
 
 func copyImageToClipboard() {
