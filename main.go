@@ -2,26 +2,47 @@ package main
 
 import (
 	"fmt"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"github.com/golang/glog"
 	"github.com/kbinani/screenshot"
-	//"image/png"
-	//"os"
+	"image/draw"
 )
 
+type GoShot struct {
+	App fyne.App
+	Win fyne.Window // Main window.
+
+	Screenshot draw.Image
+}
+
 func main() {
+	gs := &GoShot{
+		App: app.New(),
+	}
+	if err := gs.MakeScreenshot(); err != nil {
+		glog.Fatalf("Failed to capture screenshot: %s", err)
+	}
+	gs.BuildEditWindow()
+	gs.Win.ShowAndRun()
+}
+
+func (gs *GoShot) MakeScreenshot() error {
 	n := screenshot.NumActiveDisplays()
 	if n != 1 {
 		glog.Warningf("No support for multiple displays yet (should be relatively easy to add), screenshotting first display.")
 	}
-
 	bounds := screenshot.GetDisplayBounds(0)
-	img, err := screenshot.CaptureRect(bounds)
+	var err error
+	gs.Screenshot, err = screenshot.CaptureRect(bounds)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	fmt.Printf("Bounds: %+v\n", bounds)
-	fmt.Printf("Image Rect: %v\n", img.Rect)
+	glog.Infof("Bounds: %+v\n", bounds)
+	return nil
 	//
 	//fileName := fmt.Sprintf("%d_%dx%d.png", i, bounds.Dx(), bounds.Dy())
 	//file, _ := os.Create(fileName)
@@ -29,4 +50,36 @@ func main() {
 	//png.Encode(file, img)
 	//
 	//fmt.Printf("#%d : %v \"%s\"\n", i, bounds, fileName)
+}
+
+func (gs *GoShot) BuildEditWindow() {
+	gs.Win = gs.App.NewWindow("Hello")
+
+	// Build menu.
+	menuFile := fyne.NewMenu("File")// fyne.NewMenuItem("Exit", func() { gsApp.Quit() } ),
+
+	menuShare := fyne.NewMenu("Share",
+		fyne.NewMenuItem("Copy (clipboard)", func() { copyImageToClipboard() }),
+		fyne.NewMenuItem("GoogleDrive", func() { shareWithGoogleDrive() }),
+	)
+	mainMenu := fyne.NewMainMenu(menuFile, menuShare)
+	gs.Win.SetMainMenu(mainMenu)
+
+	// Side toolbar.
+
+	// Image canvas.
+	canvasImg := canvas.NewImageFromImage(gs.Screenshot)
+	canvasImg.SetMinSize(fyne.NewSize(800.0, 600.0))
+	// Status bar.
+
+	// Stitch all together.
+	gs.Win.SetContent(container.NewMax(canvasImg))
+}
+
+func copyImageToClipboard() {
+	fmt.Println("copyImageToClipboard")
+}
+
+func shareWithGoogleDrive() {
+	fmt.Println("shareWithGoogleDrive")
 }
