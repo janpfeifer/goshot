@@ -6,6 +6,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/validation"
 	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
 	"github.com/kbinani/screenshot"
@@ -14,11 +15,16 @@ import (
 )
 
 type GoShot struct {
+	// Fyne: Application and Window
 	App fyne.App
 	Win fyne.Window // Main window.
 
+	// Screenshot information
 	Screenshot     draw.Image
 	ScreenshotTime time.Time
+
+	// UI elements
+	zoomEntry *widget.Entry
 }
 
 func main() {
@@ -79,17 +85,30 @@ func (gs *GoShot) BuildEditWindow() {
 
 	// Image canvas.
 	canvasImg := canvas.NewImageFromImage(gs.Screenshot)
-	canvasImg.SetMinSize(fyne.NewSize(100.0, 100.0))
+	//canvasImg.SetMinSize(fyne.NewSize(100.0, 100.0))
+
 	// Status bar.
+	gs.zoomEntry = &widget.Entry{Validator: validation.NewRegexp(`\d`, "Must contain a number")}
+	gs.zoomEntry.SetPlaceHolder("0.0")
+	statusValue := widget.NewLabel(fmt.Sprintf("Rect: %s", gs.Screenshot.Bounds()))
+
+	statusBar := container.NewBorder(
+		nil,
+		nil,
+		nil,
+		container.NewHBox(widget.NewLabel("Zoom:"), gs.zoomEntry),
+		statusValue,
+	)
 
 	// Stitch all together.
 	split := container.NewHSplit(
-		container.NewMax(canvasImg),
+		canvasImg,
 		toolBar,
 	)
 	split.Offset = 0.8
 
-	gs.Win.SetContent(split)
+	gs.Win.SetContent(container.NewBorder(
+		nil, statusBar, nil, nil, container.NewMax(split)))
 	gs.Win.Resize(fyne.NewSize(800.0, 600.0))
 }
 
