@@ -1,16 +1,19 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/canvas"
+	"strconv"
+
+	//"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/validation"
 	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
 	"github.com/kbinani/screenshot"
-	"image/draw"
+	"image"
 	"time"
 )
 
@@ -20,14 +23,19 @@ type GoShot struct {
 	Win fyne.Window // Main window.
 
 	// Screenshot information
-	Screenshot     draw.Image
+	Screenshot     *image.RGBA
 	ScreenshotTime time.Time
+	Crop           image.Rectangle
 
 	// UI elements
-	zoomEntry *widget.Entry
+	zoomEntry      *widget.Entry
+	statusValue    *widget.Label
+	viewPort       *ViewPort
+	viewPortScroll *container.Scroll
 }
 
 func main() {
+	flag.Parse()
 	gs := &GoShot{
 		App: app.NewWithID("GoShot"),
 	}
@@ -50,6 +58,7 @@ func (gs *GoShot) MakeScreenshot() error {
 		return err
 	}
 	gs.ScreenshotTime = time.Now()
+	gs.Crop = gs.Screenshot.Bounds()
 
 	glog.Infof("Bounds: %+v\n", bounds)
 	return nil
@@ -84,25 +93,35 @@ func (gs *GoShot) BuildEditWindow() {
 	)
 
 	// Image canvas.
-	canvasImg := canvas.NewImageFromImage(gs.Screenshot)
+	// canvasImg := canvas.NewImageFromImage(gs.Screenshot)
+	gs.viewPort = NewViewPort(gs)
+	gs.viewPortScroll = container.NewScroll(gs.viewPort) // canvasImg)
 	//canvasImg.SetMinSize(fyne.NewSize(100.0, 100.0))
 
 	// Status bar.
 	gs.zoomEntry = &widget.Entry{Validator: validation.NewRegexp(`\d`, "Must contain a number")}
 	gs.zoomEntry.SetPlaceHolder("0.0")
-	statusValue := widget.NewLabel(fmt.Sprintf("Rect: %s", gs.Screenshot.Bounds()))
+	gs.zoomEntry.OnChanged = func(str string) {
+		glog.V(2).Infof("Zoom level changed to %s", str)
+		val, err := strconv.ParseFloat(str, 64)
+		if err == nil {
+			gs.viewPort.Log2Zoom = val
+			gs.viewPort.Refresh()
+		}
+	}
+	gs.statusValue = widget.NewLabel(fmt.Sprintf("Rect: %s", gs.Screenshot.Bounds()))
 
 	statusBar := container.NewBorder(
 		nil,
 		nil,
 		nil,
 		container.NewHBox(widget.NewLabel("Zoom:"), gs.zoomEntry),
-		statusValue,
+		gs.statusValue,
 	)
 
 	// Stitch all together.
 	split := container.NewHSplit(
-		canvasImg,
+		gs.viewPortScroll,
 		toolBar,
 	)
 	split.Offset = 0.8
