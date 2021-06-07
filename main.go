@@ -23,15 +23,16 @@ type GoShot struct {
 	Win fyne.Window // Main window.
 
 	// Screenshot information
-	Screenshot     *image.RGBA
-	ScreenshotTime time.Time
-	Crop           image.Rectangle
+	Screenshot, OriginalScreenshot *image.RGBA
+	ScreenshotTime                 time.Time
+	Crop                           image.Rectangle
 
 	// UI elements
 	zoomEntry      *widget.Entry
 	statusValue    *widget.Label
 	viewPort       *ViewPort
 	viewPortScroll *container.Scroll
+	miniMap        *MiniMap
 }
 
 func main() {
@@ -57,6 +58,7 @@ func (gs *GoShot) MakeScreenshot() error {
 	if err != nil {
 		return err
 	}
+	gs.OriginalScreenshot = gs.Screenshot
 	gs.ScreenshotTime = time.Now()
 	gs.Crop = gs.Screenshot.Bounds()
 
@@ -85,7 +87,9 @@ func (gs *GoShot) BuildEditWindow() {
 	gs.Win.SetMainMenu(mainMenu)
 
 	// Side toolbar.
+	gs.miniMap = NewMiniMap(gs)
 	toolBar := container.NewVBox(
+		gs.miniMap,
 		widget.NewButton("Crop", nil),
 		widget.NewButton("Arrow", nil),
 		widget.NewButton("Circle", nil),
@@ -95,8 +99,8 @@ func (gs *GoShot) BuildEditWindow() {
 	// Image canvas.
 	// canvasImg := canvas.NewImageFromImage(gs.Screenshot)
 	gs.viewPort = NewViewPort(gs)
-	gs.viewPortScroll = container.NewScroll(gs.viewPort) // canvasImg)
-	//canvasImg.SetMinSize(fyne.NewSize(100.0, 100.0))
+	// No programmable scrolling in Fyne yet -- only if we pregenerate the whole image at the zoom level, which
+	// would be too much memory.
 
 	// Status bar.
 	gs.zoomEntry = &widget.Entry{Validator: validation.NewRegexp(`\d`, "Must contain a number")}
@@ -121,7 +125,7 @@ func (gs *GoShot) BuildEditWindow() {
 
 	// Stitch all together.
 	split := container.NewHSplit(
-		gs.viewPortScroll,
+		gs.viewPort,
 		toolBar,
 	)
 	split.Offset = 0.8

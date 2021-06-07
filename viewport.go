@@ -37,6 +37,7 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		gs: gs,
 	}
 	vp.raster = canvas.NewRaster(vp.draw)
+	vp.SetMinSize(fyne.NewSize(100, 100))
 	return
 }
 
@@ -44,7 +45,6 @@ func (vp *ViewPort) Scrolled(ev *fyne.ScrollEvent) {
 	glog.V(2).Infof("Scrolled(dx=%f, dy=%f)", ev.Scrolled.DX, ev.Scrolled.DY)
 	vp.Log2Zoom += float64(ev.Scrolled.DY) / 50.0
 	vp.gs.zoomEntry.SetText(fmt.Sprintf("%.3g", vp.Log2Zoom))
-	vp.renderCache()
 	vp.Refresh()
 }
 
@@ -94,6 +94,7 @@ func (vp *ViewPort) Layout(size fyne.Size) {
 
 func (vp *ViewPort) Refresh() {
 	glog.V(2).Info("Refresh()")
+	vp.renderCache()
 	canvas.Refresh(vp)
 }
 
@@ -111,21 +112,25 @@ func wh(img image.Image) (int, int) {
 	return rect.Dx(), rect.Dy()
 }
 
+func (vp *ViewPort) zoomFactor() float64 {
+	return math.Exp2(-vp.Log2Zoom)
+}
+
 func (vp *ViewPort) renderCache() {
 	const bytesPerPixel = 4 // RGBA.
 	w, h := wh(vp.cache)
 	img := vp.gs.Screenshot
 	imgW, imgH := wh(img)
-	zoomFactor := math.Exp2(-vp.Log2Zoom)
+	zoom := vp.zoomFactor()
 
 	var c color.RGBA
 	glog.V(2).Infof("renderCache(): cache=(w=%d, h=%d, bytes=%d), zoomFactor=%g",
-		w, h, len(vp.cache.Pix), zoomFactor)
+		w, h, len(vp.cache.Pix), zoom)
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			pos := (y*w + x) * bytesPerPixel
-			imgX := int(math.Round(float64(x)*zoomFactor + 0.5))
-			imgY := int(math.Round(float64(y)*zoomFactor + 0.5))
+			imgX := int(math.Round(float64(x)*zoom + 0.5))
+			imgY := int(math.Round(float64(y)*zoom + 0.5))
 			if imgX >= imgW || imgY >= imgH {
 				// Background image.
 				c = bgPattern(x, y)
