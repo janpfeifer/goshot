@@ -90,6 +90,9 @@ func (vp *ViewPort) Scrolled(ev *fyne.ScrollEvent) {
 	vp.viewX = screenshotX - int(ratioX*float32(vp.viewW)+0.5)
 	vp.viewY = screenshotY - int(ratioY*float32(vp.viewH)+0.5)
 	vp.Refresh()
+	if vp.gs.miniMap != nil {
+		vp.gs.miniMap.updateViewPortRect()
+	}
 }
 
 func (vp *ViewPort) updateViewSize() {
@@ -112,6 +115,9 @@ func (vp *ViewPort) draw(w, h int) image.Image {
 	// Regenerate cache.
 	vp.cache = image.NewRGBA(image.Rect(0, 0, w, h))
 	vp.updateViewSize()
+	if vp.gs.miniMap != nil {
+		vp.gs.miniMap.updateViewPortRect()
+	}
 	vp.renderCache()
 	return vp.cache
 }
@@ -159,6 +165,9 @@ func (vp *ViewPort) BackgroundColor() color.Color {
 
 // wh extracts the width and height of an image.
 func wh(img image.Image) (int, int) {
+	if img == nil {
+		return 0, 0
+	}
 	rect := img.Bounds()
 	return rect.Dx(), rect.Dy()
 }

@@ -19,8 +19,9 @@ type MiniMap struct {
 	vp *ViewPort
 
 	// Fyne/UI related objects.
-	minSize                 fyne.Size
-	thumbRaster, viewRaster *canvas.Raster
+	minSize      fyne.Size
+	thumbRaster  *canvas.Raster
+	viewPortRect *canvas.Rectangle
 	// Cache image for current dimensions/zoom/translation.
 	cache *image.RGBA
 
@@ -30,11 +31,21 @@ type MiniMap struct {
 	thumbW, thumbH int     // Width and height of thumbnail.
 }
 
+var (
+	Yellow      = color.RGBA{255, 255, 0, 255}
+	Transparent = color.RGBA{0, 0, 0, 0}
+)
+
 func NewMiniMap(gs *GoShot, vp *ViewPort) (mm *MiniMap) {
 	mm = &MiniMap{
 		gs: gs,
+		vp: vp,
 	}
 	mm.thumbRaster = canvas.NewRaster(mm.draw)
+	mm.viewPortRect = canvas.NewRectangle(Yellow)
+	mm.viewPortRect.FillColor = Transparent
+	mm.viewPortRect.StrokeColor = Yellow
+	mm.viewPortRect.StrokeWidth = 1.5
 	mm.SetMinSize(fyne.NewSize(200, 200))
 	return
 }
@@ -52,14 +63,69 @@ func (mm *MiniMap) draw(w, h int) image.Image {
 
 	// Regenerate cache.
 	mm.cache = image.NewRGBA(image.Rect(0, 0, w, h))
+	mm.updateViewPortRect()
 	mm.renderCache()
 	return mm.cache
+}
+
+// drawViewPortRectangle draws a rectangle around the area that is being displayed in the
+// ViewPort.
+func (mm *MiniMap) drawViewPortRectangle(x, y, _, _ int) color.Color {
+	if x == y {
+		glog.Infof("viewPortRectangle(x=%d, y=%d)", x, y)
+		return color.White
+	}
+	return color.RGBA{200, 200, 200, 0}
 }
 
 func (mm *MiniMap) Resize(size fyne.Size) {
 	glog.V(2).Infof("Resize(size={w=%g, h=%g})", size.Width, size.Height)
 	mm.BaseWidget.Resize(size)
 	mm.thumbRaster.Resize(size)
+	mm.updateViewPortRect()
+}
+
+func (mm *MiniMap) updateViewPortRect() {
+	if mm.cache == nil {
+		return
+	}
+
+	size := mm.Size()
+	screenshotW, screenshotH := wh(mm.gs.Screenshot)
+	ratioX := float64(mm.vp.viewX) / float64(screenshotW)
+	ratioY := float64(mm.vp.viewY) / float64(screenshotH)
+	ratioW := float64(mm.vp.viewW) / float64(screenshotW)
+	ratioH := float64(mm.vp.viewH) / float64(screenshotH)
+
+	pixelX := mm.thumbX + int(math.Round(ratioX*float64(mm.thumbW)))
+	pixelW := int(math.Round(ratioW * float64(mm.thumbW)))
+	pixelY := mm.thumbY + int(math.Round(ratioY*float64(mm.thumbH)))
+	pixelH := int(math.Round(ratioH * float64(mm.thumbH)))
+
+	w, h := wh(mm.cache)
+	posX := float32(pixelX) * size.Width / float32(w)
+	posY := float32(pixelY) * size.Height / float32(h)
+	posW := float32(pixelW) * size.Width / float32(w)
+	posH := float32(pixelH) * size.Height / float32(h)
+
+	// Clip rectangle to minimap area.
+	if posX < 0 {
+		posW += posX
+		posX = 0
+	}
+	if posY < 0 {
+		posH += posY
+		posY = 0
+	}
+	if posX+posW > size.Width {
+		posW = size.Width - posX
+	}
+	if posY+posH > size.Height {
+		posH = size.Height - posY
+	}
+
+	mm.viewPortRect.Move(fyne.NewPos(posX, posY))
+	mm.viewPortRect.Resize(fyne.NewSize(posW, posH))
 }
 
 func (mm *MiniMap) SetMinSize(size fyne.Size) {
@@ -81,6 +147,7 @@ func (mm *MiniMap) Layout(size fyne.Size) {
 	glog.V(2).Infof("Layout: size=(w=%g, h=%g)", size.Width, size.Height)
 	// Resize to given size
 	mm.thumbRaster.Resize(size)
+	mm.viewPortRect.Resize(size)
 }
 
 func (mm *MiniMap) Refresh() {
@@ -90,7 +157,7 @@ func (mm *MiniMap) Refresh() {
 }
 
 func (mm *MiniMap) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{mm.thumbRaster}
+	return []fyne.CanvasObject{mm.thumbRaster, mm.viewPortRect}
 }
 
 func (mm *MiniMap) BackgroundColor() color.Color {
