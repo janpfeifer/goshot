@@ -86,8 +86,11 @@ func (gs *GoShot) BuildEditWindow() {
 	mainMenu := fyne.NewMainMenu(menuFile, menuShare)
 	gs.Win.SetMainMenu(mainMenu)
 
+	// Image canvas.
+	gs.viewPort = NewViewPort(gs)
+
 	// Side toolbar.
-	gs.miniMap = NewMiniMap(gs)
+	gs.miniMap = NewMiniMap(gs, gs.viewPort)
 	toolBar := container.NewVBox(
 		gs.miniMap,
 		widget.NewButton("Crop", nil),
@@ -95,12 +98,6 @@ func (gs *GoShot) BuildEditWindow() {
 		widget.NewButton("Circle", nil),
 		widget.NewButton("Text", nil),
 	)
-
-	// Image canvas.
-	// canvasImg := canvas.NewImageFromImage(gs.Screenshot)
-	gs.viewPort = NewViewPort(gs)
-	// No programmable scrolling in Fyne yet -- only if we pregenerate the whole image at the zoom level, which
-	// would be too much memory.
 
 	// Status bar.
 	gs.zoomEntry = &widget.Entry{Validator: validation.NewRegexp(`\d`, "Must contain a number")}
@@ -110,6 +107,7 @@ func (gs *GoShot) BuildEditWindow() {
 		val, err := strconv.ParseFloat(str, 64)
 		if err == nil {
 			gs.viewPort.Log2Zoom = val
+			gs.viewPort.updateViewSize()
 			gs.viewPort.Refresh()
 		}
 	}

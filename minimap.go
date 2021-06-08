@@ -14,25 +14,27 @@ import (
 type MiniMap struct {
 	widget.BaseWidget
 
-	gs      *GoShot
-	minSize fyne.Size
+	// Application references.
+	gs *GoShot
+	vp *ViewPort
 
-	raster *canvas.Raster
+	// Fyne/UI related objects.
+	minSize                 fyne.Size
+	thumbRaster, viewRaster *canvas.Raster
+	// Cache image for current dimensions/zoom/translation.
+	cache *image.RGBA
 
 	// Geometry: changed whenever window changes sizes.
 	zoom           float64 // Zoom multiplier.
 	thumbX, thumbY int     // Start position of thumbnail.
 	thumbW, thumbH int     // Width and height of thumbnail.
-
-	// Cache image for current dimensions/zoom/translation.
-	cache *image.RGBA
 }
 
-func NewMiniMap(gs *GoShot) (mm *MiniMap) {
+func NewMiniMap(gs *GoShot, vp *ViewPort) (mm *MiniMap) {
 	mm = &MiniMap{
 		gs: gs,
 	}
-	mm.raster = canvas.NewRaster(mm.draw)
+	mm.thumbRaster = canvas.NewRaster(mm.draw)
 	mm.SetMinSize(fyne.NewSize(200, 200))
 	return
 }
@@ -57,7 +59,7 @@ func (mm *MiniMap) draw(w, h int) image.Image {
 func (mm *MiniMap) Resize(size fyne.Size) {
 	glog.V(2).Infof("Resize(size={w=%g, h=%g})", size.Width, size.Height)
 	mm.BaseWidget.Resize(size)
-	mm.raster.Resize(size)
+	mm.thumbRaster.Resize(size)
 }
 
 func (mm *MiniMap) SetMinSize(size fyne.Size) {
@@ -78,7 +80,7 @@ func (mm *MiniMap) Destroy() {}
 func (mm *MiniMap) Layout(size fyne.Size) {
 	glog.V(2).Infof("Layout: size=(w=%g, h=%g)", size.Width, size.Height)
 	// Resize to given size
-	mm.raster.Resize(size)
+	mm.thumbRaster.Resize(size)
 }
 
 func (mm *MiniMap) Refresh() {
@@ -88,7 +90,7 @@ func (mm *MiniMap) Refresh() {
 }
 
 func (mm *MiniMap) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{mm.raster}
+	return []fyne.CanvasObject{mm.thumbRaster}
 }
 
 func (mm *MiniMap) BackgroundColor() color.Color {
