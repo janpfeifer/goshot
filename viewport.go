@@ -38,6 +38,14 @@ type ViewPort struct {
 	cache *image.RGBA
 }
 
+// Ensure ViewPort implements the following interfaces.
+var (
+	vpPlaceholder = &ViewPort{}
+	_             = fyne.CanvasObject(vpPlaceholder)
+	//_             = fyne.Tappable(vpPlaceholder)
+	//_             = fyne.Draggable(vpPlaceholder)
+)
+
 func NewViewPort(gs *GoShot) (vp *ViewPort) {
 	vp = &ViewPort{
 		gs: gs,

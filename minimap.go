@@ -27,9 +27,21 @@ type MiniMap struct {
 
 	// Geometry: changed whenever window changes sizes.
 	zoom           float64 // Zoom multiplier.
-	thumbX, thumbY int     // Start position of thumbnail.
-	thumbW, thumbH int     // Width and height of thumbnail.
+	thumbX, thumbY int     // Start pixel position of thumbnail.
+	thumbW, thumbH int     // Pixel width and height of thumbnail.
+
+	// Dynamic dragging
+	dragEvents chan *fyne.DragEvent
 }
+
+// Ensure MiniMap implements the following interfaces.
+var (
+	mmPlaceholder = &MiniMap{}
+	_             = fyne.CanvasObject(mmPlaceholder)
+	_             = fyne.Tappable(mmPlaceholder)
+	_             = fyne.Draggable(mmPlaceholder)
+	_             = fyne.Tappable(mmPlaceholder)
+)
 
 var (
 	Yellow      = color.RGBA{255, 255, 0, 255}
@@ -126,6 +138,88 @@ func (mm *MiniMap) updateViewPortRect() {
 
 	mm.viewPortRect.Move(fyne.NewPos(posX, posY))
 	mm.viewPortRect.Resize(fyne.NewSize(posW, posH))
+}
+
+func (mm *MiniMap) Tapped(ev *fyne.PointEvent) {
+	glog.V(2).Infof("Tapped(pos=%+v)", ev.Position)
+	mm.moveViewToPosition(ev.Position)
+}
+
+const dragEventsQueue = 1000 // We could make it much smaller by adding a separate gorouting, but this is simpler.
+
+// Dragged implements fyne.Draggable
+func (mm *MiniMap) Dragged(ev *fyne.DragEvent) {
+	//glog.V(2).Infof("Dragged(pos=%+v, dx=%d, dy=%d)", ev.Position, ev.Dragged.DX, ev.Dragged.DY)
+	if mm.dragEvents == nil {
+		// Create a channel to send dragEvents and start goroutine to consume them sequentially.
+		mm.dragEvents = make(chan *fyne.DragEvent, dragEventsQueue)
+		go mm.consumeDragEvents()
+	}
+	mm.dragEvents <- ev
+}
+
+func (mm *MiniMap) consumeDragEvents() {
+	var prevPos fyne.Position
+	for done := false; !done; {
+		var ev *fyne.DragEvent
+		// Read all events in channel, until it blocks or is closed.
+		consumed := 0
+	drainDragEvents:
+		for {
+			select {
+			case newEvent := <-mm.dragEvents:
+				if newEvent == nil {
+					// Channel closed.
+					done = true
+					break drainDragEvents // Emptied the channel.
+				} else {
+					// New event arrived.
+					consumed++
+					if consumed%10 == 0 {
+						glog.Info("here")
+					}
+					ev = newEvent
+				}
+			default:
+				break drainDragEvents // Emptied the channel.
+			}
+		}
+		if ev != nil {
+			newPos := ev.Position.Add(fyne.Vector2(ev.Dragged))
+			if newPos.X != prevPos.X || newPos.Y != prevPos.Y {
+				prevPos = newPos
+				glog.V(2).Infof("consumeDragEvents(pos=%+v, consumed=%d)", newPos, consumed)
+				mm.moveViewToPosition(newPos)
+			}
+		}
+	}
+	glog.V(2).Info("consumeDragEvents(): done")
+}
+
+// DragEnd implements fyne.Draggable
+func (mm *MiniMap) DragEnd() {
+	close(mm.dragEvents)
+	mm.dragEvents = nil
+}
+
+func (mm *MiniMap) moveViewToPosition(pos fyne.Position) {
+	size := mm.Size()
+	pixW, pixH := wh(mm.cache)
+	screenshotW, screenshotH := wh(mm.gs.Screenshot)
+
+	pixX := pos.X * float32(pixW) / size.Width
+	pixY := pos.Y * float32(pixH) / size.Height
+
+	ratioX := (pixX - float32(mm.thumbX)) / float32(mm.thumbW)
+	ratioY := (pixY - float32(mm.thumbY)) / float32(mm.thumbH)
+
+	glog.V(2).Infof("- pos ratio: (%g, %g)", ratioX, ratioY)
+
+	mm.vp.viewX = int(ratioX*float32(screenshotW) - float32(mm.vp.viewW)/2 + 0.5)
+	mm.vp.viewY = int(ratioY*float32(screenshotH) - float32(mm.vp.viewH)/2 + 0.5)
+	mm.vp.Refresh()
+	mm.updateViewPortRect()
+	// mm.viewPortRect.Refresh()
 }
 
 func (mm *MiniMap) SetMinSize(size fyne.Size) {
