@@ -21,15 +21,18 @@ import (
 type ViewPort struct {
 	widget.BaseWidget
 
-	gs       *GoShot
-	minSize  fyne.Size
+	// gs points back to application object.
+	gs *GoShot
+
+	// Geometry of what is being displayed:
+	// Log2Zoom is the log2 of the zoom multiplier, it's what we show to the user.
 	Log2Zoom float64
 
-	raster *canvas.Raster
-
+	// Fyne objects.
+	minSize fyne.Size
+	raster  *canvas.Raster
 	// Cache image for current dimensions/zoom/translation.
-	cache                   *image.RGBA
-	cacheWidth, cacheHeight int
+	cache *image.RGBA
 }
 
 func NewViewPort(gs *GoShot) (vp *ViewPort) {

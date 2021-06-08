@@ -19,9 +19,13 @@ type MiniMap struct {
 
 	raster *canvas.Raster
 
+	// Geometry: changed whenever window changes sizes.
+	zoom           float64 // Zoom multiplier.
+	thumbX, thumbY int     // Start position of thumbnail.
+	thumbW, thumbH int     // Width and height of thumbnail.
+
 	// Cache image for current dimensions/zoom/translation.
-	cache                   *image.RGBA
-	cacheWidth, cacheHeight int
+	cache *image.RGBA
 }
 
 func NewMiniMap(gs *GoShot) (mm *MiniMap) {
@@ -91,26 +95,46 @@ func (mm *MiniMap) BackgroundColor() color.Color {
 	return theme.BackgroundColor()
 }
 
-func (mm *MiniMap) renderCache() {
-	const bytesPerPixel = 4 // RGBA.
+func (mm *MiniMap) refreshGeometry() {
 	w, h := wh(mm.cache)
 	img := mm.gs.Screenshot
 	imgW, imgH := wh(img)
-	zoom := float64(imgW) / float64(w)
-	zoomY := float64(imgH) / float64(h)
-	if zoomY > zoom {
-		zoom = zoomY
-	}
 
+	zoomX := float64(imgW) / float64(w)
+	zoomY := float64(imgH) / float64(h)
+	if zoomY > zoomX {
+		mm.zoom = zoomY
+		mm.thumbH = h
+		mm.thumbY = 0
+		mm.thumbW = int(math.Round(float64(imgW) / mm.zoom))
+		mm.thumbX = (w - mm.thumbW) / 2
+	} else {
+		mm.zoom = zoomX
+		mm.thumbW = w
+		mm.thumbX = 0
+		mm.thumbH = int(math.Round(float64(imgH) / mm.zoom))
+		mm.thumbY = (h - mm.thumbH) / 2
+	}
+}
+
+func (mm *MiniMap) renderCache() {
+	mm.refreshGeometry()
+	w, h := wh(mm.cache)
+	img := mm.gs.Screenshot
+	imgW, imgH := wh(img)
+
+	const bytesPerPixel = 4 // RGBA.
 	var c color.RGBA
-	glog.V(2).Infof("renderCache(): cache=(w=%d, h=%d, bytes=%d), zoomFactor=%g",
-		w, h, len(mm.cache.Pix), zoom)
+
+	glog.V(2).Infof("renderCache(): cache=(w=%d, h=%d, bytes=%d), zoom=%gx",
+		w, h, len(mm.cache.Pix), mm.zoom)
+
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			pos := (y*w + x) * bytesPerPixel
-			imgX := int(math.Round(float64(x)*zoom + 0.5))
-			imgY := int(math.Round(float64(y)*zoom + 0.5))
-			if imgX >= imgW || imgY >= imgH {
+			imgX := int(math.Round(float64(x-mm.thumbX)*mm.zoom + 0.5))
+			imgY := int(math.Round(float64(y-mm.thumbY)*mm.zoom + 0.5))
+			if imgX < 0 || imgX >= imgW || imgY < 0 || imgY >= imgH {
 				// Background image.
 				c = bgPattern(x, y)
 			} else {
