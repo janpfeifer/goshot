@@ -185,7 +185,7 @@ func (mm *MiniMap) consumeDragEvents() {
 			}
 		}
 		if ev != nil {
-			newPos := ev.Position.Add(fyne.Vector2(ev.Dragged))
+			newPos := ev.Position
 			if newPos.X != prevPos.X || newPos.Y != prevPos.Y {
 				prevPos = newPos
 				glog.V(2).Infof("consumeDragEvents(pos=%+v, consumed=%d)", newPos, consumed)

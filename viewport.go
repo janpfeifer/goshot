@@ -36,14 +36,19 @@ type ViewPort struct {
 	raster  *canvas.Raster
 	// Cache image for current dimensions/zoom/translation.
 	cache *image.RGBA
+
+	// Dynamic dragging
+	dragEvents                     chan *fyne.DragEvent
+	dragStart                      fyne.Position
+	dragStartViewX, dragStartViewY int
 }
 
 // Ensure ViewPort implements the following interfaces.
 var (
 	vpPlaceholder = &ViewPort{}
 	_             = fyne.CanvasObject(vpPlaceholder)
+	_             = fyne.Draggable(vpPlaceholder)
 	//_             = fyne.Tappable(vpPlaceholder)
-	//_             = fyne.Draggable(vpPlaceholder)
 )
 
 func NewViewPort(gs *GoShot) (vp *ViewPort) {
@@ -223,4 +228,79 @@ func bgPattern(x, y int) color.RGBA {
 		return bgDark
 	}
 	return bgLight
+}
+
+// ===============================================================
+// Implementation of dragging view window on ViewPort
+// ===============================================================
+
+// Dragged implements fyne.Draggable
+func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
+	//glog.V(2).Infof("Dragged(pos=%+v, dx=%d, dy=%d)", ev.Position, ev.Dragged.DX, ev.Dragged.DY)
+	if vp.dragEvents == nil {
+		// Create a channel to send dragEvents and start goroutine to consume them sequentially.
+		vp.dragEvents = make(chan *fyne.DragEvent, dragEventsQueue)
+		vp.dragStart = ev.Position
+		vp.dragStartViewX = vp.viewX
+		vp.dragStartViewY = vp.viewY
+		go vp.consumeDragEvents()
+		return // No need to process first event.
+	}
+	vp.dragEvents <- ev
+}
+
+func (vp *ViewPort) consumeDragEvents() {
+	var prevDragPos fyne.Position
+	for done := false; !done; {
+		var ev *fyne.DragEvent
+		// Read all events in channel, until it blocks or is closed.
+		consumed := 0
+	drainDragEvents:
+		for {
+			select {
+			case newEvent := <-vp.dragEvents:
+				if newEvent == nil {
+					// Channel closed.
+					done = true
+					break drainDragEvents // Emptied the channel.
+				} else {
+					// New event arrived.
+					consumed++
+					if consumed%10 == 0 {
+						glog.Info("here")
+					}
+					ev = newEvent
+				}
+			default:
+				break drainDragEvents // Emptied the channel.
+			}
+		}
+		if ev != nil {
+			if ev.Position != prevDragPos {
+				prevDragPos = ev.Position
+				glog.V(2).Infof("consumeDragEvents(pos=%+v, consumed=%d)", ev.Position, consumed)
+				vp.dragDelta(ev.Position.Subtract(vp.dragStart))
+			}
+		}
+	}
+	vp.dragStart = fyne.Position{}
+	glog.V(2).Info("consumeDragEvents(): done")
+}
+
+func (vp *ViewPort) dragDelta(delta fyne.Position) {
+	size := vp.Size()
+
+	ratioX := delta.X / size.Width
+	ratioY := delta.Y / size.Height
+
+	vp.viewX = vp.dragStartViewX - int(ratioX*float32(vp.viewW)+0.5)
+	vp.viewY = vp.dragStartViewY - int(ratioY*float32(vp.viewH)+0.5)
+	vp.Refresh()
+	vp.gs.miniMap.updateViewPortRect()
+}
+
+// DragEnd implements fyne.Draggable
+func (vp *ViewPort) DragEnd() {
+	close(vp.dragEvents)
+	vp.dragEvents = nil
 }
