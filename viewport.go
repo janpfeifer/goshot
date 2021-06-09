@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
@@ -36,7 +37,11 @@ type ViewPort struct {
 	// Fyne objects.
 	minSize fyne.Size
 	raster  *canvas.Raster
-	cursor  *canvas.Image
+
+	cursor                                   *canvas.Image
+	cursorCropTopLeft, cursorCropBottomRight *canvas.Image
+
+	mouseIn bool // Whether the mouse is over ViewPort.
 
 	// Cache image for current dimensions/zoom/translation.
 	cache *image.RGBA
@@ -71,17 +76,17 @@ var (
 	_             = fyne.CanvasObject(vpPlaceholder)
 	_             = fyne.Draggable(vpPlaceholder)
 	_             = fyne.Tappable(vpPlaceholder)
+	_             = desktop.Hoverable(vpPlaceholder)
 )
 
 func NewViewPort(gs *GoShot) (vp *ViewPort) {
 	vp = &ViewPort{
-		gs:       gs,
-		cropRect: gs.OriginalScreenshot.Rect,
-		cursor:   canvas.NewImageFromResource(resources.Reset),
+		gs:                    gs,
+		cropRect:              gs.OriginalScreenshot.Rect,
+		cursorCropTopLeft:     canvas.NewImageFromResource(resources.CropTopLeft),
+		cursorCropBottomRight: canvas.NewImageFromResource(resources.CropBottomRight),
 	}
 	vp.raster = canvas.NewRaster(vp.draw)
-	vp.cursor.SetMinSize(fyne.NewSize(64, 64))
-	vp.cursor.Resize(fyne.NewSize(100, 100))
 	return
 }
 
@@ -89,7 +94,6 @@ func (vp *ViewPort) Resize(size fyne.Size) {
 	glog.V(2).Infof("Resize(size={w=%g, h=%g})", size.Width, size.Height)
 	vp.BaseWidget.Resize(size)
 	vp.raster.Resize(size)
-	vp.cursor.Resize(fyne.NewSize(100, 100))
 }
 
 func (vp *ViewPort) SetMinSize(size fyne.Size) {
@@ -121,7 +125,7 @@ func (vp *ViewPort) Refresh() {
 
 func (vp *ViewPort) Objects() []fyne.CanvasObject {
 	glog.V(3).Info("Objects()")
-	if vp.cursor == nil {
+	if vp.cursor == nil || !vp.mouseIn {
 		return []fyne.CanvasObject{vp.raster}
 	}
 	return []fyne.CanvasObject{vp.raster, vp.cursor}
@@ -343,8 +347,31 @@ func (vp *ViewPort) DragEnd() {
 //func (vp *ViewPort) Set
 
 // ===============================================================
+// Implementation of cursors, implements desktop.Hoverable.
+// ===============================================================
+
+func (vp *ViewPort) MouseIn(ev *desktop.MouseEvent) {
+	vp.mouseIn = true
+	if vp.cursor != nil {
+		vp.cursor.Move(ev.Position)
+	}
+}
+
+func (vp *ViewPort) MouseMoved(ev *desktop.MouseEvent) {
+	if vp.cursor != nil {
+		vp.cursor.Move(ev.Position)
+		vp.Refresh()
+	}
+}
+
+func (vp *ViewPort) MouseOut() {
+	vp.mouseIn = false
+}
+
+// ===============================================================
 // Implementation of operations on ViewPort
 // ===============================================================
+var cursorSize = fyne.NewSize(64, 64)
 
 // SetOp changes the current op on the edit window. It interrupts any dragging event going on.
 func (vp *ViewPort) SetOp(op OperationType) {
@@ -352,6 +379,21 @@ func (vp *ViewPort) SetOp(op OperationType) {
 		vp.DragEnd()
 	}
 	vp.currentOperation = op
+	switch op {
+	case NoOp:
+		if vp.cursor != nil {
+			vp.cursor = nil
+			vp.Refresh()
+		}
+
+	case CropTopLeft:
+		vp.cursor = vp.cursorCropTopLeft
+		vp.cursor.Resize(cursorSize)
+
+	case CropBottomRight:
+		vp.cursor = vp.cursorCropBottomRight
+		vp.cursor.Resize(cursorSize)
+	}
 }
 
 func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
