@@ -44,8 +44,8 @@ var (
 )
 
 var (
-	Yellow      = color.RGBA{255, 255, 0, 255}
-	Transparent = color.RGBA{0, 0, 0, 0}
+	Yellow      = color.RGBA{R: 255, G: 255, A: 255}
+	Transparent = color.RGBA{}
 )
 
 func NewMiniMap(gs *GoShot, vp *ViewPort) (mm *MiniMap) {
@@ -74,20 +74,11 @@ func (mm *MiniMap) draw(w, h int) image.Image {
 	}
 
 	// Regenerate cache.
+	glog.V(2).Infof("- regenerating cache %d x %d", w, h)
 	mm.cache = image.NewRGBA(image.Rect(0, 0, w, h))
 	mm.updateViewPortRect()
 	mm.renderCache()
 	return mm.cache
-}
-
-// drawViewPortRectangle draws a rectangle around the area that is being displayed in the
-// ViewPort.
-func (mm *MiniMap) drawViewPortRectangle(x, y, _, _ int) color.Color {
-	if x == y {
-		glog.Infof("viewPortRectangle(x=%d, y=%d)", x, y)
-		return color.White
-	}
-	return color.RGBA{200, 200, 200, 0}
 }
 
 func (mm *MiniMap) Resize(size fyne.Size) {
@@ -145,11 +136,10 @@ func (mm *MiniMap) Tapped(ev *fyne.PointEvent) {
 	mm.moveViewToPosition(ev.Position)
 }
 
-const dragEventsQueue = 1000 // We could make it much smaller by adding a separate gorouting, but this is simpler.
+const dragEventsQueue = 1000 // We could make it much smaller by adding a separate goroutine, but this is simpler.
 
 // Dragged implements fyne.Draggable
 func (mm *MiniMap) Dragged(ev *fyne.DragEvent) {
-	//glog.V(2).Infof("Dragged(pos=%+v, dx=%d, dy=%d)", ev.Position, ev.Dragged.DX, ev.Dragged.DY)
 	if mm.dragEvents == nil {
 		// Create a channel to send dragEvents and start goroutine to consume them sequentially.
 		mm.dragEvents = make(chan *fyne.DragEvent, dragEventsQueue)

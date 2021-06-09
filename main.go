@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"github.com/janpfeifer/goshot/resources"
 	"strconv"
 
 	//"fyne.io/fyne/v2/canvas"
@@ -29,7 +30,7 @@ type GoShot struct {
 
 	// UI elements
 	zoomEntry      *widget.Entry
-	statusValue    *widget.Label
+	status         *widget.Label
 	viewPort       *ViewPort
 	viewPortScroll *container.Scroll
 	miniMap        *MiniMap
@@ -90,16 +91,37 @@ func (gs *GoShot) BuildEditWindow() {
 	gs.viewPort = NewViewPort(gs)
 
 	// Side toolbar.
+	cropTopLeft := widget.NewButton("", func() {
+		gs.status.SetText("Click on new top-left corner")
+		gs.viewPort.SetOp(CropTopLeft)
+	})
+	cropTopLeft.SetIcon(resources.CropTopLeft)
+	cropBottomRight := widget.NewButton("", func() {
+		gs.status.SetText("Click on new bottom-right corner")
+		gs.viewPort.SetOp(CropBottomRight)
+	})
+	cropBottomRight.SetIcon(resources.CropBottomRight)
+	cropReset := widget.NewButton("", func() {
+		gs.viewPort.cropReset()
+		gs.viewPort.SetOp(NoOp)
+	})
+	cropReset.SetIcon(resources.Reset)
+
 	gs.miniMap = NewMiniMap(gs, gs.viewPort)
 	toolBar := container.NewVBox(
 		gs.miniMap,
-		widget.NewButton("Crop", nil),
+		container.NewHBox(
+			widget.NewLabel("Crop:"),
+			cropTopLeft,
+			cropBottomRight,
+			cropReset,
+		),
 		widget.NewButton("Arrow", nil),
 		widget.NewButton("Circle", nil),
 		widget.NewButton("Text", nil),
 	)
 
-	// Status bar.
+	// Status bar with zoom control.
 	gs.zoomEntry = &widget.Entry{Validator: validation.NewRegexp(`\d`, "Must contain a number")}
 	gs.zoomEntry.SetPlaceHolder("0.0")
 	gs.zoomEntry.OnChanged = func(str string) {
@@ -111,14 +133,20 @@ func (gs *GoShot) BuildEditWindow() {
 			gs.viewPort.Refresh()
 		}
 	}
-	gs.statusValue = widget.NewLabel(fmt.Sprintf("Rect: %s", gs.Screenshot.Bounds()))
-
+	zoomReset := widget.NewButton("", func() {
+		gs.zoomEntry.SetText("0")
+		gs.viewPort.Log2Zoom = 0
+		gs.viewPort.updateViewSize()
+		gs.viewPort.Refresh()
+	})
+	zoomReset.SetIcon(resources.Reset)
+	gs.status = widget.NewLabel(fmt.Sprintf("Image size: %s", gs.Screenshot.Bounds()))
 	statusBar := container.NewBorder(
 		nil,
 		nil,
 		nil,
-		container.NewHBox(widget.NewLabel("Zoom:"), gs.zoomEntry),
-		gs.statusValue,
+		container.NewHBox(widget.NewLabel("Zoom:"), gs.zoomEntry, zoomReset),
+		gs.status,
 	)
 
 	// Stitch all together.

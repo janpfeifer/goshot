@@ -9,6 +9,7 @@ import (
 	"github.com/golang/glog"
 	"image"
 	"image/color"
+	"image/draw"
 	"math"
 )
 
@@ -41,19 +42,37 @@ type ViewPort struct {
 	dragEvents                     chan *fyne.DragEvent
 	dragStart                      fyne.Position
 	dragStartViewX, dragStartViewY int
+
+	// Operations
+	currentOperation OperationType
+
+	// Crop position
+	cropRect image.Rectangle
 }
+
+type OperationType int
+
+const (
+	NoOp OperationType = iota
+	CropTopLeft
+	CropBottomRight
+	// DrawText
+	// DrawArrow
+	// DrawCircle
+)
 
 // Ensure ViewPort implements the following interfaces.
 var (
 	vpPlaceholder = &ViewPort{}
 	_             = fyne.CanvasObject(vpPlaceholder)
 	_             = fyne.Draggable(vpPlaceholder)
-	//_             = fyne.Tappable(vpPlaceholder)
+	_             = fyne.Tappable(vpPlaceholder)
 )
 
 func NewViewPort(gs *GoShot) (vp *ViewPort) {
 	vp = &ViewPort{
-		gs: gs,
+		gs:       gs,
+		cropRect: gs.OriginalScreenshot.Rect,
 	}
 	vp.raster = canvas.NewRaster(vp.draw)
 	vp.SetMinSize(fyne.NewSize(100, 100))
@@ -219,7 +238,7 @@ func (vp *ViewPort) renderCache() {
 }
 
 var (
-	bgDark, bgLight = color.RGBA{58, 58, 58, 0xFF}, color.RGBA{84, 84, 84, 0xFF}
+	bgDark, bgLight = color.RGBA{R: 58, G: 58, B: 58, A: 0xFF}, color.RGBA{R: 84, G: 84, B: 84, A: 0xFF}
 )
 
 func bgPattern(x, y int) color.RGBA {
@@ -236,7 +255,6 @@ func bgPattern(x, y int) color.RGBA {
 
 // Dragged implements fyne.Draggable
 func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
-	//glog.V(2).Infof("Dragged(pos=%+v, dx=%d, dy=%d)", ev.Position, ev.Dragged.DX, ev.Dragged.DY)
 	if vp.dragEvents == nil {
 		// Create a channel to send dragEvents and start goroutine to consume them sequentially.
 		vp.dragEvents = make(chan *fyne.DragEvent, dragEventsQueue)
@@ -279,7 +297,7 @@ func (vp *ViewPort) consumeDragEvents() {
 			if ev.Position != prevDragPos {
 				prevDragPos = ev.Position
 				glog.V(2).Infof("consumeDragEvents(pos=%+v, consumed=%d)", ev.Position, consumed)
-				vp.dragDelta(ev.Position.Subtract(vp.dragStart))
+				vp.dragViewDelta(ev.Position.Subtract(vp.dragStart))
 			}
 		}
 	}
@@ -287,7 +305,7 @@ func (vp *ViewPort) consumeDragEvents() {
 	glog.V(2).Info("consumeDragEvents(): done")
 }
 
-func (vp *ViewPort) dragDelta(delta fyne.Position) {
+func (vp *ViewPort) dragViewDelta(delta fyne.Position) {
 	size := vp.Size()
 
 	ratioX := delta.X / size.Width
@@ -303,4 +321,80 @@ func (vp *ViewPort) dragDelta(delta fyne.Position) {
 func (vp *ViewPort) DragEnd() {
 	close(vp.dragEvents)
 	vp.dragEvents = nil
+}
+
+// ===============================================================
+// Implementation of operations on ViewPort
+// ===============================================================
+
+// SetOp changes the current op on the edit window. It interrupts any dragging event going on.
+func (vp *ViewPort) SetOp(op OperationType) {
+	if vp.dragEvents != nil {
+		vp.DragEnd()
+	}
+	vp.currentOperation = op
+}
+
+func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
+	size := vp.Size()
+	ratioX := ev.Position.X / size.Width
+	ratioY := ev.Position.Y / size.Height
+	screenshotX := int(ratioX*float32(vp.viewW) + float32(vp.viewX) + 0.5)
+	screenshotY := int(ratioY*float32(vp.viewH) + float32(vp.viewY) + 0.5)
+
+	switch vp.currentOperation {
+	case NoOp:
+		// Nothing ...
+	case CropTopLeft:
+		vp.cropTopLeft(screenshotX, screenshotY)
+	case CropBottomRight:
+		vp.cropBottomRight(screenshotX, screenshotY)
+	}
+
+	// After a tap
+	vp.SetOp(NoOp)
+}
+
+// cropTopLeft will crop the screenshot on this position.
+func (vp *ViewPort) cropTopLeft(x, y int) {
+	fromRect := vp.gs.Screenshot.Rect
+	crop := image.NewRGBA(image.Rect(0, 0, fromRect.Dx()-x, fromRect.Dy()-y))
+	glog.V(2).Infof("cropTopLeft: new crop has size %+v", crop.Rect)
+	draw.Src.Draw(crop, crop.Rect, vp.gs.Screenshot, image.Point{X: x, Y: y})
+	vp.gs.Screenshot = crop
+	vp.cropRect.Min = vp.cropRect.Min.Add(image.Point{X: x, Y: y})
+	vp.viewX, vp.viewY = 0, 0 // Move view to cropped corner.
+	glog.V(2).Infof("cropTopLeft: new cropRect is %+v", vp.cropRect)
+	vp.postCrop()
+}
+
+// cropBottomRight will crop the screenshot on this position.
+func (vp *ViewPort) cropBottomRight(x, y int) {
+	fromRect := vp.gs.Screenshot.Rect
+	crop := image.NewRGBA(image.Rect(0, 0, x, y))
+	draw.Src.Draw(crop, crop.Rect, vp.gs.Screenshot, image.Point{})
+	vp.gs.Screenshot = crop
+	vp.cropRect.Max = vp.cropRect.Max.Sub(image.Point{X: fromRect.Dx() - x, Y: fromRect.Dy() - y})
+	vp.viewX, vp.viewY = x-vp.viewW, y-vp.viewH // Move view to cropped corner.
+	vp.postCrop()
+}
+
+func (vp *ViewPort) cropReset() {
+	vp.gs.Screenshot = vp.gs.OriginalScreenshot
+	vp.cropRect = vp.gs.Screenshot.Rect
+	vp.postCrop()
+	vp.gs.status.SetText(fmt.Sprintf("Reset to original screenshot of size %d x %d pixels.",
+		vp.cropRect.Dx(), vp.cropRect.Dy()))
+}
+
+// postCrop refreshes elements after a change in crop.
+func (vp *ViewPort) postCrop() {
+	vp.updateViewSize()
+	vp.renderCache()
+	vp.Refresh()
+	vp.gs.miniMap.updateViewPortRect()
+	vp.gs.miniMap.Refresh()
+	vp.gs.status.SetText(fmt.Sprintf("New crop: {%d, %d} - {%d, %d} of original screen, %d x %d pixels.",
+		vp.cropRect.Min.X, vp.cropRect.Min.Y, vp.cropRect.Max.X, vp.cropRect.Max.Y,
+		vp.cropRect.Dx(), vp.cropRect.Dy()))
 }
