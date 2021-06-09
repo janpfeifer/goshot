@@ -41,7 +41,8 @@ type ViewPort struct {
 	cursor                                   *canvas.Image
 	cursorCropTopLeft, cursorCropBottomRight *canvas.Image
 
-	mouseIn bool // Whether the mouse is over ViewPort.
+	mouseIn         bool // Whether the mouse is over ViewPort.
+	mouseMoveEvents chan fyne.Position
 
 	// Cache image for current dimensions/zoom/translation.
 	cache *image.RGBA
@@ -85,7 +86,9 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		cropRect:              gs.OriginalScreenshot.Rect,
 		cursorCropTopLeft:     canvas.NewImageFromResource(resources.CropTopLeft),
 		cursorCropBottomRight: canvas.NewImageFromResource(resources.CropBottomRight),
+		mouseMoveEvents:       make(chan fyne.Position, 1000),
 	}
+	go vp.consumeMouseMoveEvents()
 	vp.raster = canvas.NewRaster(vp.draw)
 	return
 }
@@ -281,12 +284,19 @@ func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 		return // No need to process first event.
 	}
 	vp.dragEvents <- ev
+	vp.mouseMoveEvents <- ev.Position // Also emits a mouse move event.
 }
 
 func (vp *ViewPort) consumeDragEvents() {
 	var prevDragPos fyne.Position
 	for done := false; !done; {
-		var ev *fyne.DragEvent
+		// Wait for something to happen.
+		ev := <-vp.dragEvents
+		if ev == nil {
+			// All done.
+			break
+		}
+
 		// Read all events in channel, until it blocks or is closed.
 		consumed := 0
 	drainDragEvents:
@@ -294,7 +304,7 @@ func (vp *ViewPort) consumeDragEvents() {
 			select {
 			case newEvent := <-vp.dragEvents:
 				if newEvent == nil {
-					// Channel closed.
+					// Channel closed, but we still need to process last event.
 					done = true
 					break drainDragEvents // Emptied the channel.
 				} else {
@@ -346,10 +356,7 @@ func (vp *ViewPort) DragEnd() {
 // ===============================================================
 //func (vp *ViewPort) Set
 
-// ===============================================================
-// Implementation of cursors, implements desktop.Hoverable.
-// ===============================================================
-
+// MouseIn implements desktop.Hoverable.
 func (vp *ViewPort) MouseIn(ev *desktop.MouseEvent) {
 	vp.mouseIn = true
 	if vp.cursor != nil {
@@ -357,15 +364,60 @@ func (vp *ViewPort) MouseIn(ev *desktop.MouseEvent) {
 	}
 }
 
+// MouseMoved implements desktop.Hoverable.
 func (vp *ViewPort) MouseMoved(ev *desktop.MouseEvent) {
 	if vp.cursor != nil {
-		vp.cursor.Move(ev.Position)
+		// Send event to channel, it will only be acted on in
+		// vp.processMouseMoveEvent.
+		vp.mouseMoveEvents <- ev.Position
+	}
+}
+
+// MouseOut implements desktop.Hoverable.
+func (vp *ViewPort) MouseOut() {
+	vp.mouseIn = false
+}
+
+// processMouseMoveEvent is the function that actually acts on a
+// mouse movement event.
+func (vp *ViewPort) processMouseMoveEvent(pos fyne.Position) {
+	if vp.cursor != nil {
+		vp.cursor.Move(pos)
 		vp.Refresh()
 	}
 }
 
-func (vp *ViewPort) MouseOut() {
-	vp.mouseIn = false
+// consumeMouseMoveEvents runs on a separate GoRoutine and
+// drains the mouse movement events before acting on the
+// last of them.
+func (vp *ViewPort) consumeMouseMoveEvents() {
+	// vp.mouseMoveEvents is only closed if app is exiting.
+	for {
+		// Wait for something to happen.
+		ev, ok := <-vp.mouseMoveEvents
+		if !ok {
+			return
+		}
+
+		// Read all events in channel, until it blocks or is closed.
+		consumed := 0
+	mouseMoveEventsLoop:
+		for {
+			select {
+			case newEvent, ok := <-vp.mouseMoveEvents:
+				if !ok {
+					return
+				}
+
+				// New event arrived.
+				consumed++
+				ev = newEvent
+			default:
+				break mouseMoveEventsLoop
+			}
+		}
+		vp.processMouseMoveEvent(ev)
+	}
 }
 
 // ===============================================================
@@ -448,6 +500,8 @@ func (vp *ViewPort) cropBottomRight(x, y int) {
 
 func (vp *ViewPort) cropReset() {
 	vp.gs.Screenshot = vp.gs.OriginalScreenshot
+	vp.viewX += vp.cropRect.Min.X
+	vp.viewY += vp.cropRect.Min.Y
 	vp.cropRect = vp.gs.Screenshot.Rect
 	vp.postCrop()
 	vp.gs.status.SetText(fmt.Sprintf("Reset to original screenshot of size %d x %d pixels.",

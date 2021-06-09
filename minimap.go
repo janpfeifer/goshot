@@ -161,36 +161,39 @@ func (mm *MiniMap) Dragged(ev *fyne.DragEvent) {
 func (mm *MiniMap) consumeDragEvents() {
 	var prevPos fyne.Position
 	for done := false; !done; {
-		var ev *fyne.DragEvent
+		// Wait for something to happen.
+		ev, ok := <-mm.dragEvents
+		if !ok {
+			// All done.
+			break
+		}
+
 		// Read all events in channel, until it blocks or is closed.
 		consumed := 0
 	drainDragEvents:
 		for {
 			select {
-			case newEvent := <-mm.dragEvents:
-				if newEvent == nil {
+			case newEvent, ok := <-mm.dragEvents:
+				if !ok {
 					// Channel closed.
 					done = true
 					break drainDragEvents // Emptied the channel.
 				} else {
 					// New event arrived.
 					consumed++
-					if consumed%10 == 0 {
-						glog.Info("here")
-					}
 					ev = newEvent
 				}
 			default:
 				break drainDragEvents // Emptied the channel.
 			}
 		}
-		if ev != nil {
-			newPos := ev.Position
-			if newPos.X != prevPos.X || newPos.Y != prevPos.Y {
-				prevPos = newPos
-				glog.V(2).Infof("consumeDragEvents(pos=%+v, consumed=%d)", newPos, consumed)
-				mm.moveViewToPosition(newPos)
-			}
+
+		// Process last drag event.
+		newPos := ev.Position
+		if newPos.X != prevPos.X || newPos.Y != prevPos.Y {
+			prevPos = newPos
+			glog.V(2).Infof("consumeDragEvents(pos=%+v, consumed=%d)", newPos, consumed)
+			mm.moveViewToPosition(newPos)
 		}
 	}
 	glog.V(2).Info("consumeDragEvents(): done")
