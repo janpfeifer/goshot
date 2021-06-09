@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
+	"github.com/janpfeifer/goshot/resources"
 	"image"
 	"image/color"
 	"image/draw"
@@ -35,6 +36,8 @@ type ViewPort struct {
 	// Fyne objects.
 	minSize fyne.Size
 	raster  *canvas.Raster
+	cursor  *canvas.Image
+
 	// Cache image for current dimensions/zoom/translation.
 	cache *image.RGBA
 
@@ -42,6 +45,7 @@ type ViewPort struct {
 	dragEvents                     chan *fyne.DragEvent
 	dragStart                      fyne.Position
 	dragStartViewX, dragStartViewY int
+	dragSkipTap                    bool // Set at DragEnd(), because the end of the drag also triggers a tap.
 
 	// Operations
 	currentOperation OperationType
@@ -73,10 +77,58 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 	vp = &ViewPort{
 		gs:       gs,
 		cropRect: gs.OriginalScreenshot.Rect,
+		cursor:   canvas.NewImageFromResource(resources.Reset),
 	}
 	vp.raster = canvas.NewRaster(vp.draw)
-	vp.SetMinSize(fyne.NewSize(100, 100))
+	vp.cursor.SetMinSize(fyne.NewSize(64, 64))
+	vp.cursor.Resize(fyne.NewSize(100, 100))
 	return
+}
+
+func (vp *ViewPort) Resize(size fyne.Size) {
+	glog.V(2).Infof("Resize(size={w=%g, h=%g})", size.Width, size.Height)
+	vp.BaseWidget.Resize(size)
+	vp.raster.Resize(size)
+	vp.cursor.Resize(fyne.NewSize(100, 100))
+}
+
+func (vp *ViewPort) SetMinSize(size fyne.Size) {
+	vp.minSize = size
+}
+
+func (vp *ViewPort) MinSize() fyne.Size {
+	return vp.minSize
+}
+
+func (vp *ViewPort) CreateRenderer() fyne.WidgetRenderer {
+	glog.V(2).Info("CreateRenderer()")
+	return vp
+}
+
+func (vp *ViewPort) Destroy() {}
+
+func (vp *ViewPort) Layout(size fyne.Size) {
+	glog.V(2).Infof("Layout: size=(w=%g, h=%g)", size.Width, size.Height)
+	// Resize to given size
+	vp.raster.Resize(size)
+}
+
+func (vp *ViewPort) Refresh() {
+	glog.V(2).Info("Refresh()")
+	vp.renderCache()
+	canvas.Refresh(vp)
+}
+
+func (vp *ViewPort) Objects() []fyne.CanvasObject {
+	glog.V(3).Info("Objects()")
+	if vp.cursor == nil {
+		return []fyne.CanvasObject{vp.raster}
+	}
+	return []fyne.CanvasObject{vp.raster, vp.cursor}
+}
+
+func (vp *ViewPort) BackgroundColor() color.Color {
+	return theme.BackgroundColor()
 }
 
 // PixelSize returns the size in pixels of the this CanvasObject, based on the last request to redraw.
@@ -141,6 +193,7 @@ func (vp *ViewPort) draw(w, h int) image.Image {
 	currentW, currentH := vp.PixelSize()
 	if currentW == w && currentH == h {
 		// Cache is good, reuse it.
+		glog.V(2).Infof("- reuse")
 		return vp.cache
 	}
 
@@ -152,47 +205,6 @@ func (vp *ViewPort) draw(w, h int) image.Image {
 	}
 	vp.renderCache()
 	return vp.cache
-}
-
-func (vp *ViewPort) Resize(size fyne.Size) {
-	glog.V(2).Infof("Resize(size={w=%g, h=%g})", size.Width, size.Height)
-	vp.BaseWidget.Resize(size)
-	vp.raster.Resize(size)
-}
-
-func (vp *ViewPort) SetMinSize(size fyne.Size) {
-	vp.minSize = size
-}
-
-func (vp *ViewPort) MinSize() fyne.Size {
-	return vp.minSize
-}
-
-func (vp *ViewPort) CreateRenderer() fyne.WidgetRenderer {
-	glog.V(2).Info("CreateRenderer()")
-	return vp
-}
-
-func (vp *ViewPort) Destroy() {}
-
-func (vp *ViewPort) Layout(size fyne.Size) {
-	glog.V(2).Infof("Layout: size=(w=%g, h=%g)", size.Width, size.Height)
-	// Resize to given size
-	vp.raster.Resize(size)
-}
-
-func (vp *ViewPort) Refresh() {
-	glog.V(2).Info("Refresh()")
-	vp.renderCache()
-	canvas.Refresh(vp)
-}
-
-func (vp *ViewPort) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{vp.raster}
-}
-
-func (vp *ViewPort) BackgroundColor() color.Color {
-	return theme.BackgroundColor()
 }
 
 // wh extracts the width and height of an image.
@@ -319,9 +331,16 @@ func (vp *ViewPort) dragViewDelta(delta fyne.Position) {
 
 // DragEnd implements fyne.Draggable
 func (vp *ViewPort) DragEnd() {
+	glog.V(2).Infof("DragEnd(), dragEvents=%v", vp.dragEvents != nil)
 	close(vp.dragEvents)
 	vp.dragEvents = nil
+	vp.dragSkipTap = true
 }
+
+// ===============================================================
+// Implementation of a cursor on ViewPort
+// ===============================================================
+//func (vp *ViewPort) Set
 
 // ===============================================================
 // Implementation of operations on ViewPort
@@ -336,6 +355,12 @@ func (vp *ViewPort) SetOp(op OperationType) {
 }
 
 func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
+	glog.V(2).Infof("Tapped(pos=%+v), dragSkipTag=%v", ev.Position, vp.dragSkipTap)
+	if vp.dragSkipTap {
+		// End of a drag, we discard this tap.
+		vp.dragSkipTap = false
+		return
+	}
 	size := vp.Size()
 	ratioX := ev.Position.X / size.Width
 	ratioY := ev.Position.Y / size.Height
