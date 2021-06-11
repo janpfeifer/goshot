@@ -204,7 +204,7 @@ func copyImageToClipboard(gs *GoShot) {
 		glog.Errorf("Failed to copy to clipboard: %s", err)
 		gs.status.SetText(fmt.Sprintf("Failed to copy to clipboard: %s", err))
 	} else {
-		gs.status.SetText(fmt.Sprintf("Screenshot copied to clipboard: %s", err))
+		gs.status.SetText(fmt.Sprintf("Screenshot copied to clipboard"))
 	}
 }
 
