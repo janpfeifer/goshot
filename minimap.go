@@ -112,7 +112,7 @@ func (mm *MiniMap) updateViewPortRect() {
 	posY := float32(pixelY) * size.Height / float32(h)
 	posW := float32(pixelW) * size.Width / float32(w)
 	posH := float32(pixelH) * size.Height / float32(h)
-	glog.Infof("- pos: x=%g, y=%g, w=%g, h=%g", posX, posY, posW, posH)
+	glog.V(2).Infof("- pos: x=%g, y=%g, w=%g, h=%g", posX, posY, posW, posH)
 
 	// Clip rectangle to minimap area.
 	if posX < 0 {
@@ -135,7 +135,7 @@ func (mm *MiniMap) updateViewPortRect() {
 	if posY+posH > size.Height {
 		posH = size.Height - posY
 	}
-	glog.Infof("- clipped pos: x=%g, y=%g, w=%g, h=%g", posX, posY, posW, posH)
+	glog.V(2).Infof("- clipped pos: x=%g, y=%g, w=%g, h=%g", posX, posY, posW, posH)
 
 	mm.viewPortRect.Move(fyne.NewPos(posX, posY))
 	mm.viewPortRect.Resize(fyne.NewSize(posW, posH))

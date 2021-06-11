@@ -40,6 +40,7 @@ type ViewPort struct {
 
 	cursor                                   *canvas.Image
 	cursorCropTopLeft, cursorCropBottomRight *canvas.Image
+	cursorCircle                             *canvas.Image
 
 	mouseIn         bool // Whether the mouse is over ViewPort.
 	mouseMoveEvents chan fyne.Position
@@ -58,6 +59,8 @@ type ViewPort struct {
 
 	// Crop position
 	cropRect image.Rectangle
+
+	fyne.ShortcutHandler
 }
 
 type OperationType int
@@ -66,9 +69,9 @@ const (
 	NoOp OperationType = iota
 	CropTopLeft
 	CropBottomRight
+	DrawCircle
 	// DrawText
 	// DrawArrow
-	// DrawCircle
 )
 
 // Ensure ViewPort implements the following interfaces.

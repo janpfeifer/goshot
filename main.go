@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/driver/desktop"
+	"github.com/janpfeifer/goshot/clipboard"
 	"github.com/janpfeifer/goshot/resources"
+	"image/png"
 	"strconv"
 
 	//"fyne.io/fyne/v2/canvas"
@@ -63,7 +67,7 @@ func (gs *GoShot) MakeScreenshot() error {
 	gs.ScreenshotTime = time.Now()
 	gs.Crop = gs.Screenshot.Bounds()
 
-	glog.Infof("Bounds: %+v\n", bounds)
+	glog.V(2).Infof("Screenshot captured bounds: %+v\n", bounds)
 	return nil
 	//
 	//fileName := fmt.Sprintf("%d_%dx%d.png", i, bounds.Dx(), bounds.Dy())
@@ -81,7 +85,7 @@ func (gs *GoShot) BuildEditWindow() {
 	menuFile := fyne.NewMenu("File") // fyne.NewMenuItem("Exit", func() { gsApp.Quit() } ),
 
 	menuShare := fyne.NewMenu("Share",
-		fyne.NewMenuItem("Copy (clipboard)", func() { copyImageToClipboard() }),
+		fyne.NewMenuItem("Copy (clipboard)", func() { copyImageToClipboard(gs) }),
 		fyne.NewMenuItem("GoogleDrive", func() { shareWithGoogleDrive() }),
 	)
 	mainMenu := fyne.NewMainMenu(menuFile, menuShare)
@@ -117,7 +121,10 @@ func (gs *GoShot) BuildEditWindow() {
 			cropReset,
 		),
 		widget.NewButton("Arrow", nil),
-		widget.NewButton("Circle", nil),
+		widget.NewButton("Circle", func() {
+			gs.viewPort.SetOp(DrawCircle)
+			gs.status.SetText("Click and drag to draw circle!")
+		}),
 		widget.NewButton("Text", nil),
 	)
 
@@ -156,13 +163,49 @@ func (gs *GoShot) BuildEditWindow() {
 	)
 	split.Offset = 0.8
 
-	gs.Win.SetContent(container.NewBorder(
-		nil, statusBar, nil, nil, container.NewMax(split)))
+	topLevel := container.NewBorder(
+		nil, statusBar, nil, nil, container.NewMax(split))
+	gs.Win.SetContent(topLevel)
 	gs.Win.Resize(fyne.NewSize(800.0, 600.0))
+
+	// Register shortcuts.
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyQ, desktop.ControlModifier},
+		func(shortcut fyne.Shortcut) {
+			glog.Infof("Quit requested by shortcut %s", shortcut.ShortcutName())
+			gs.App.Quit()
+		})
+
+	gs.Win.Canvas().AddShortcut(
+		&fyne.ShortcutCopy{},
+		func(_ fyne.Shortcut) { copyImageToClipboard(gs) })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyC, desktop.AltModifier}, printShortcut)
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyT, desktop.AltModifier}, printShortcut)
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyA, desktop.AltModifier}, printShortcut)
+
+	gs.Win.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if ev.Name == fyne.KeyEscape {
+			gs.viewPort.SetOp(NoOp)
+		} else {
+			glog.V(2).Infof("KeyTyped: %+v", ev)
+		}
+	})
 }
 
-func copyImageToClipboard() {
-	fmt.Println("copyImageToClipboard")
+func printShortcut(shortcut fyne.Shortcut) {
+	glog.Infof("Shortcut: %s", shortcut.ShortcutName())
+}
+
+func copyImageToClipboard(gs *GoShot) {
+	glog.V(2).Info("copyImageToClipboard")
+	var contentBuffer bytes.Buffer
+	png.Encode(&contentBuffer, gs.Screenshot)
+	err := clipboard.CopyImage(contentBuffer.Bytes())
+	if err != nil {
+		glog.Errorf("Failed to copy to clipboard: %s", err)
+		gs.status.SetText(fmt.Sprintf("Failed to copy to clipboard: %s", err))
+	} else {
+		gs.status.SetText(fmt.Sprintf("Screenshot copied to clipboard: %s", err))
+	}
 }
 
 func shareWithGoogleDrive() {
