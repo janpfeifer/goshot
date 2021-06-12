@@ -498,13 +498,6 @@ func (vp *ViewPort) cropBottomRight(x, y int) {
 	vp.gs.Screenshot = crop
 	vp.cropRect.Max = vp.cropRect.Max.Sub(image.Point{X: fromRect.Dx() - x, Y: fromRect.Dy() - y})
 	vp.viewX, vp.viewY = x-vp.viewW, y-vp.viewH // Move view to cropped corner.
-	// Full image fits the view port in any of the dimensions, then we center the image.
-	if vp.cropRect.Dx() < vp.viewW {
-		vp.viewX = -(vp.viewW - vp.cropRect.Dx()) / 2
-	}
-	if vp.cropRect.Dy() < vp.viewH {
-		vp.viewY = -(vp.viewH - vp.cropRect.Dy()) / 2
-	}
 	vp.postCrop()
 }
 
@@ -520,6 +513,14 @@ func (vp *ViewPort) cropReset() {
 
 // postCrop refreshes elements after a change in crop.
 func (vp *ViewPort) postCrop() {
+	// Full image fits the view port in any of the dimensions, then we center the image.
+	if vp.cropRect.Dx() < vp.viewW {
+		vp.viewX = -(vp.viewW - vp.cropRect.Dx()) / 2
+	}
+	if vp.cropRect.Dy() < vp.viewH {
+		vp.viewY = -(vp.viewH - vp.cropRect.Dy()) / 2
+	}
+
 	vp.updateViewSize()
 	vp.renderCache()
 	vp.Refresh()
