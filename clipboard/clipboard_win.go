@@ -3,9 +3,9 @@
 package clipboard
 
 import (
-	"bytes"
+	"errors"
+	"github.com/lxn/win"
 	"image"
-	"image/png"
 	"time"
 )
 
@@ -17,45 +17,22 @@ import "C"
 import (
 	"github.com/golang/glog"
 	"runtime"
-	"syscall"
 	"unsafe"
 )
 
 const (
-	cfUnicodetext = 13
-	cfDIBV5       = 17
-	gmemMoveable  = 0x0002
+	LCS_WINDOWS_COLOR_SPACE = 0x57696E20
 
 	clipboardOpenMaxTime = 1 * time.Second
 )
 
-var (
-	user32                     = syscall.MustLoadDLL("user32")
-	isClipboardFormatAvailable = user32.MustFindProc("IsClipboardFormatAvailable")
-	openClipboard              = user32.MustFindProc("OpenClipboard")
-	closeClipboard             = user32.MustFindProc("CloseClipboard")
-	emptyClipboard             = user32.MustFindProc("EmptyClipboard")
-	getClipboardData           = user32.MustFindProc("GetClipboardData")
-	setClipboardData           = user32.MustFindProc("SetClipboardData")
-	registerClipboardFormat    = user32.MustFindProc("RegisterClipboardFormatA")
-
-	kernel32      = syscall.NewLazyDLL("kernel32")
-	globalAlloc   = kernel32.NewProc("GlobalAlloc")
-	globalFree    = kernel32.NewProc("GlobalFree")
-	globalLock    = kernel32.NewProc("GlobalLock")
-	globalUnlock  = kernel32.NewProc("GlobalUnlock")
-	rtlMoveMemory = kernel32.NewProc("RtlMoveMemory")
-	lstrcpy       = kernel32.NewProc("lstrcpyW")
-)
-
 func CopyImage(img image.Image) error {
-	var contentBuffer bytes.Buffer
-	png.Encode(&contentBuffer, img)
-	content := contentBuffer.Bytes()
-
-	glog.V(2).Infof("copyImageToClipboard(%d bytes)", len(content))
-	writeImage(content)
-	//writeText(fmt.Sprintf("Need to write PNG with %d bytes", len(content)))
+	glog.V(2).Infof("CopyImage(bounds=%+v)", img.Bounds())
+	hBitmap, err := hBitmapFromImage(img)
+	if err != nil {
+		return err
+	}
+	writeHBitmap(hBitmap)
 	return nil
 }
 
@@ -64,20 +41,17 @@ func CopyImage(img image.Image) error {
 func waitOpenClipboard() error {
 	started := time.Now()
 	limit := started.Add(clipboardOpenMaxTime)
-	var r uintptr
-	var err error
 	for time.Now().Before(limit) {
-		r, _, err = openClipboard.Call(0)
-		if r != 0 {
+		if win.OpenClipboard(0) {
 			return nil
 		}
 		time.Sleep(3 * time.Millisecond)
 	}
-	return err
+	return errors.New("failed win.OpenClipboard()")
 }
 
-func writeImage(content []byte) error {
-	glog.V(2).Infof("writeImage: content with %d bytes", len(content))
+func writeHBitmap(hBitmap win.HBITMAP) error {
+	glog.V(2).Infof("writeHBitmap()")
 
 	// LockOSThread ensure that the whole method will keep executing on the same thread from begin to end (it actually locks the goroutine thread attribution).
 	// Otherwise if the goroutine switch thread during execution (which is a common practice), the OpenClipboard and CloseClipboard will happen on two different threads, and it will result in a clipboard deadlock.
@@ -88,137 +62,68 @@ func writeImage(content []byte) error {
 	if err != nil {
 		return err
 	}
-	glog.V(2).Infof("writeAll: clipboard opened.")
+	glog.V(2).Infof("writeHBitmap: clipboard opened.")
+	defer win.CloseClipboard()
 
-	r, _, err := emptyClipboard.Call(0)
-	if r == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
+	if !win.EmptyClipboard() {
+		return errors.New("failed win.EmptyClipboard()")
 	}
-	glog.V(2).Infof("writeAll: clipboard emptied.")
-
-	// "If the hMem parameter identifies a memory object, the object must have
-	// been allocated using the function with the GMEM_MOVEABLE flag."
-	movableDataHandle, _, err := globalAlloc.Call(gmemMoveable, uintptr(len(content)))
-	//movableDataHandle, _, err := globalAlloc.Call(gmemMoveable, uintptr(dataSize))
-	if movableDataHandle == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
-	}
-	defer func() {
-		if movableDataHandle != 0 {
-			globalFree.Call(movableDataHandle)
-		}
-	}()
-	glog.V(2).Infof("writeAll: got moveableDataHandle=0x%X", movableDataHandle)
-
-	lockedData, _, err := globalLock.Call(movableDataHandle)
-	if lockedData == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
-	}
-	glog.V(2).Infof("writeAll: mapped data handle to 0x%X", lockedData)
-
-	r, _, err = rtlMoveMemory.Call(lockedData, uintptr(unsafe.Pointer(&content[0])), uintptr(len(content)))
-	//r, _, err = rtlMoveMemory.Call(lockedData, uintptr(unsafe.Pointer(&data[0])), uintptr(dataSize))
-	if r == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
-	}
-	glog.V(2).Infof("writeAll: content copied")
-
-	r, _, err = globalUnlock.Call(movableDataHandle)
-	if r == 0 {
-		if err.(syscall.Errno) != 0 {
-			_, _, _ = closeClipboard.Call()
-			return err
-		}
-	}
-	glog.V(2).Infof("writeAll: globalUnlock'ed")
-
-	//clipboardFormat := C.CString("image/png")
-	//clipboardFormat := C.CString("PNG")
-	//formatId, _, err := registerClipboardFormat.Call(uintptr(unsafe.Pointer(clipboardFormat)))
-	//defer C.free(unsafe.Pointer(clipboardFormat))
-	//glog.V(2).Infof("writeAll: formatId=%d", formatId)
-
-	r, _, err = setClipboardData.Call(cfDIBV5, movableDataHandle)
-	//r, _, err = setClipboardData.Call(cfUnicodetext, movableDataHandle)
-	if r == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
-	}
-	glog.V(2).Infof("writeAll: presumably clipboard set ?")
-
-	movableDataHandle = 0 // Ownership transferred, suppress deferred cleanup.
-	closed, _, err := closeClipboard.Call()
-	if closed == 0 {
-		return err
-	}
+	glog.V(2).Infof("writeHBitmap: clipboard emptied.")
+	win.SetClipboardData(win.CF_BITMAP, win.HANDLE(hBitmap))
 	return nil
 }
 
-func writeText(text string) error {
-	// LockOSThread ensure that the whole method will keep executing on the same thread from begin to end (it actually locks the goroutine thread attribution).
-	// Otherwise if the goroutine switch thread during execution (which is a common practice), the OpenClipboard and CloseClipboard will happen on two different threads, and it will result in a clipboard deadlock.
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+func hBitmapFromImage(im image.Image) (win.HBITMAP, error) {
+	bi := &win.BITMAPV5HEADER{
+		BITMAPV4HEADER: win.BITMAPV4HEADER{
+			BITMAPINFOHEADER: win.BITMAPINFOHEADER{
+				BiWidth:         int32(im.Bounds().Dx()),
+				BiHeight:        -int32(im.Bounds().Dy()), // Negative values means image is top-down (y=0 -> top pixels)
+				BiPlanes:        1,
+				BiBitCount:      32,
+				BiCompression:   win.BI_BITFIELDS,
+				BiSizeImage:     uint32(im.Bounds().Dx() * im.Bounds().Dy() * 4), // Size in bytes.
+				BiXPelsPerMeter: 2834,
+				BiYPelsPerMeter: 2834,
+			},
 
-	err := waitOpenClipboard()
-	if err != nil {
-		return err
+			// The following mask specification specifies a supported 32 BPP
+			// alpha format for Windows XP.
+			BV4RedMask:   0x00FF0000,
+			BV4GreenMask: 0x0000FF00,
+			BV4BlueMask:  0x000000FF,
+			BV4AlphaMask: 0xFF000000,
+
+			BV4CSType: LCS_WINDOWS_COLOR_SPACE,
+		},
 	}
+	bi.BiSize = uint32(unsafe.Sizeof(*bi)) // This size tells that this is a BITMAPV5HEADER.
 
-	r, _, err := emptyClipboard.Call(0)
-	if r == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
+	hdc := win.GetDC(0)
+	defer win.ReleaseDC(0, hdc)
+
+	var lpBits unsafe.Pointer
+
+	// Create the DIB section with an alpha channel.
+	hBitmap := win.CreateDIBSection(hdc, &bi.BITMAPINFOHEADER, win.DIB_RGB_COLORS, &lpBits, 0, 0)
+	switch hBitmap {
+	case 0, win.ERROR_INVALID_PARAMETER:
+		return 0, errors.New("CreateDIBSection failed")
 	}
-
-	data := syscall.StringToUTF16(text)
-
-	// "If the hMem parameter identifies a memory object, the object must have
-	// been allocated using the function with the GMEM_MOVEABLE flag."
-	h, _, err := globalAlloc.Call(gmemMoveable, uintptr(len(data)*int(unsafe.Sizeof(data[0]))))
-	if h == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
-	}
-	defer func() {
-		if h != 0 {
-			globalFree.Call(h)
+	glog.V(2).Infof("header=%+v", &bi)
+	// Fill the image
+	bitmapArray := (*[1 << 30]byte)(unsafe.Pointer(lpBits))
+	i := 0
+	for y := im.Bounds().Min.Y; y != im.Bounds().Max.Y; y++ {
+		for x := im.Bounds().Min.X; x != im.Bounds().Max.X; x++ {
+			r, g, b, a := im.At(x, y).RGBA()
+			bitmapArray[i+3] = byte(a >> 8)
+			bitmapArray[i+2] = byte(r >> 8)
+			bitmapArray[i+1] = byte(g >> 8)
+			bitmapArray[i+0] = byte(b >> 8)
+			i += 4
 		}
-	}()
-
-	l, _, err := globalLock.Call(h)
-	if l == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
 	}
 
-	r, _, err = lstrcpy.Call(l, uintptr(unsafe.Pointer(&data[0])))
-	if r == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
-	}
-
-	r, _, err = globalUnlock.Call(h)
-	if r == 0 {
-		if err.(syscall.Errno) != 0 {
-			_, _, _ = closeClipboard.Call()
-			return err
-		}
-	}
-
-	r, _, err = setClipboardData.Call(cfUnicodetext, h)
-	if r == 0 {
-		_, _, _ = closeClipboard.Call()
-		return err
-	}
-	h = 0 // suppress deferred cleanup
-	closed, _, err := closeClipboard.Call()
-	if closed == 0 {
-		return err
-	}
-	return nil
+	return hBitmap, nil
 }
