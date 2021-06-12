@@ -3,21 +3,33 @@
 package clipboard
 
 import (
+	"bytes"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"github.com/lxn/win"
 	"image"
+	"image/png"
+	"strings"
+	"syscall"
 	"time"
 )
 
 // Windows clipboard manager version: based on https://github.com/atotto/clipboard.
 
 // #include <stdlib.h>
+// #include <string.h>
 import "C"
 
 import (
 	"github.com/golang/glog"
 	"runtime"
 	"unsafe"
+)
+
+var (
+	user32                      = syscall.MustLoadDLL("user32.dll")
+	procRegisterClipboardFormat = user32.MustFindProc("RegisterClipboardFormatA")
 )
 
 const (
@@ -28,19 +40,67 @@ const (
 
 func CopyImage(img image.Image) error {
 	glog.V(2).Infof("CopyImage(bounds=%+v)", img.Bounds())
-	hBitmap, bitmapHeader, bitmapBits, err := hBitmapFromImage(img)
-	if err != nil {
-		return err
-	}
 
 	// CF_DIBV5 version
-	data, err := bitmapToGlobalAlloc(bitmapHeader, bitmapBits)
+	hBitmap, bitmapHeader, bitmapBits, err := hBitmapV5FromImage(img)
 	if err != nil {
 		return err
 	}
-	win.DeleteObject(win.HGDIOBJ(hBitmap)) // hBitmap is no longer needed, once copied.
+	glog.V(2).Infof("sizeof(BITMAPV5HEADER)=%d", unsafe.Sizeof(*bitmapHeader))
+	glog.V(2).Infof("sizeof(BITMAPINFOHEADER)=%d", unsafe.Sizeof(bitmapHeader.BITMAPINFOHEADER))
+	dibV5Data, err := bitmapToGlobalAlloc(&bitmapHeader.BITMAPINFOHEADER, bitmapBits)
+	win.GlobalFree(win.HGLOBAL(hBitmap))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if dibV5Data != 0 {
+			win.GlobalFree(dibV5Data)
+		}
+	}()
 
-	return safeSetClipboardData(win.CF_DIBV5, win.HANDLE(data))
+	// CF_DIB version: it's only needed because Chromium is broken, see
+	// discussion in
+	// https://github.com/tannerhelland/PhotoDemon/issues/343
+
+	// "PNG" format.
+	var pngContentBuffer bytes.Buffer
+	_ = png.Encode(&pngContentBuffer, img)
+	pngContent := pngContentBuffer.Bytes()
+	pngData, err := bytesToGlobalAlloc(&pngContent[0], len(pngContent))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if pngData != 0 {
+			win.GlobalFree(pngData)
+		}
+	}()
+
+	// "HTML Format"
+	html := imageToHMLEncode(img)
+	htmlCStr := C.CString(html)
+	htmlData, err := bytesToGlobalAlloc((*byte)(unsafe.Pointer(htmlCStr)), int(C.strlen(htmlCStr)))
+	C.free(unsafe.Pointer(htmlCStr))
+	if err != nil {
+		return err
+	}
+
+	err = safeSetClipboardData([]formatAndData{
+		//{ Format: win.CF_DIB, Data: win.HANDLE(dibData) },
+		{Format: win.CF_DIBV5, Data: win.HANDLE(dibV5Data)},
+		{RegisteredFormat: "PNG", Data: win.HANDLE(pngData)},
+		{RegisteredFormat: "HTML Format", Data: win.HANDLE(htmlData)},
+	})
+	dibV5Data = 0
+	pngData = 0
+	return err
+}
+
+type formatAndData struct {
+	Format           uint32 // Ignored if registeredFormat is given.
+	RegisteredFormat string
+	Data             win.HANDLE
 }
 
 // safeSetClipboardData is a wrapper around all the clipboard "bureaucracy".
@@ -48,8 +108,8 @@ func CopyImage(img image.Image) error {
 // https://docs.microsoft.com/en-us/windows/win32/dataxchg/standard-clipboard-formats.
 //
 // No support for registered formats yet -- should be simple to add.
-func safeSetClipboardData(format uint32, handle win.HANDLE) error {
-	glog.V(2).Infof("writeHBitmap()")
+func safeSetClipboardData(formats []formatAndData) error {
+	glog.V(2).Infof("safeSetClipboardData()")
 
 	// LockOSThread ensure that the whole method will keep executing on the same thread from begin to end (it actually locks the goroutine thread attribution).
 	// Otherwise if the goroutine switch thread during execution (which is a common practice), the OpenClipboard and CloseClipboard will happen on two different threads, and it will result in a clipboard deadlock.
@@ -60,14 +120,28 @@ func safeSetClipboardData(format uint32, handle win.HANDLE) error {
 	if err != nil {
 		return err
 	}
-	glog.V(2).Infof("writeHBitmap: clipboard opened.")
+	glog.V(2).Infof("safeSetClipboardData: clipboard opened.")
 	defer win.CloseClipboard()
 
 	if !win.EmptyClipboard() {
 		return errors.New("failed win.EmptyClipboard()")
 	}
-	glog.V(2).Infof("writeHBitmap: clipboard emptied.")
-	win.SetClipboardData(format, handle)
+	glog.V(2).Infof("safeSetClipboardData: clipboard emptied.")
+
+	for _, fd := range formats {
+		var res win.HANDLE
+		glog.V(2).Infof("- setting %+v", fd)
+		if fd.RegisteredFormat == "" {
+			res = win.SetClipboardData(fd.Format, fd.Data)
+		} else {
+			format := registerClipboardFormat(fd.RegisteredFormat)
+			res = win.SetClipboardData(format, fd.Data)
+		}
+		if res == 0 {
+			// Free resource, since setting of clipboard failed.
+			win.GlobalFree(win.HGLOBAL(fd.Data))
+		}
+	}
 	return nil
 }
 
@@ -96,7 +170,23 @@ func bitmapToGlobalAlloc(bitmapHeader *win.BITMAPINFOHEADER, bitmapBits unsafe.P
 	return movableDataHandle, nil
 }
 
-func hBitmapFromImage(im image.Image) (hBitmap win.HBITMAP, bitmapHeader *win.BITMAPINFOHEADER, bitmapBits unsafe.Pointer, err error) {
+// bytesToGlobalAlloc converts byte data to a GMEM_MOVEABLE global alloc to be used the clipboard.
+func bytesToGlobalAlloc(data *byte, length int) (win.HGLOBAL, error) {
+	movableDataHandle := win.GlobalAlloc(win.GMEM_MOVEABLE, uintptr(length))
+	if movableDataHandle == 0 {
+		return 0, errors.New("call to GlobalAlloc failed")
+	}
+	lockedData := win.GlobalLock(movableDataHandle)
+	if lockedData == nil {
+		return 0, errors.New("call to GlobalLock failed")
+	}
+	win.MoveMemory(lockedData, unsafe.Pointer(data), uintptr(length))
+	win.GlobalUnlock(movableDataHandle)
+	return movableDataHandle, nil
+}
+
+// Creates a hBitmap V5 (DIBV5) bitmap.
+func hBitmapV5FromImage(im image.Image) (hBitmap win.HBITMAP, bitmapHeader *win.BITMAPV5HEADER, bitmapBits unsafe.Pointer, err error) {
 	bi := &win.BITMAPV5HEADER{
 		BITMAPV4HEADER: win.BITMAPV4HEADER{
 			BITMAPINFOHEADER: win.BITMAPINFOHEADER{
@@ -148,7 +238,7 @@ func hBitmapFromImage(im image.Image) (hBitmap win.HBITMAP, bitmapHeader *win.BI
 		}
 	}
 
-	return hBitmap, &bi.BITMAPINFOHEADER, bitmapBits, nil
+	return hBitmap, bi, bitmapBits, nil
 }
 
 // waitOpenClipboard opens the clipboard, polling every 3 milliseconds
@@ -163,4 +253,45 @@ func waitOpenClipboard() error {
 		time.Sleep(3 * time.Millisecond)
 	}
 	return errors.New("failed win.OpenClipboard()")
+}
+
+func registerClipboardFormat(format string) uint32 {
+	p := C.CString(format)
+	r, _, _ := procRegisterClipboardFormat.Call(uintptr(unsafe.Pointer(p)))
+	C.free(unsafe.Pointer(p))
+	return uint32(r)
+}
+
+func imageToHMLEncode(img image.Image) string {
+	var pngContentBuffer bytes.Buffer
+	_ = png.Encode(&pngContentBuffer, img)
+	convertWinLF := func(str string) string {
+		return strings.ReplaceAll(str, "\n", "\r\n")
+	}
+	headerFn := func(htmlStart, htmlEnd, fragStart, fragEnd int) string {
+		return convertWinLF(fmt.Sprintf(
+			"Version 0.9\n"+
+				"StartHTML:%010d\n"+
+				"EndHTML:%010d\n"+
+				"StartFragment:%010d\n"+
+				"EndFragment:%010d\n"+
+				"SourceURL:about:blank\n",
+			htmlStart, htmlEnd, fragStart, fragEnd))
+	}
+	preamble := convertWinLF("<html>\n<body>\n<!--StartFragment-->")
+	htmlStart := len(headerFn(0, 0, 0, 0))
+	fragmentStart := htmlStart + len(preamble)
+	pngBase64 := base64.StdEncoding.EncodeToString(pngContentBuffer.Bytes())
+	imgTag := fmt.Sprintf("<img src=\"data:image/png;base64,%s\"/>", pngBase64)
+	fragmentEnd := fragmentStart + len(imgTag)
+	suffix := convertWinLF(fmt.Sprintf("<!--EndFragment-->\n</body>\n</html>"))
+	htmlEnd := fragmentEnd + len(suffix)
+
+	return strings.Join(
+		[]string{
+			headerFn(htmlStart, htmlEnd, fragmentStart, fragmentEnd),
+			preamble,
+			imgTag,
+			suffix,
+		}, "")
 }
