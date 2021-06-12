@@ -3,8 +3,11 @@
 package clipboard
 
 import (
+	"bytes"
 	"errors"
 	"github.com/golang/glog"
+	"image"
+	"image/png"
 	"sync"
 	"unsafe"
 )
