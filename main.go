@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"github.com/janpfeifer/goshot/clipboard"
 	"github.com/janpfeifer/goshot/resources"
+	"image/draw"
 	"strconv"
 
 	//"fyne.io/fyne/v2/canvas"
@@ -51,7 +52,9 @@ type Filter interface {
 // ApplyFilters will apply `Filters` to the `CropRect` of the original image
 // and regenerate Screenshot.
 func (gs *GoShot) ApplyFilters() {
-
+	crop := image.NewRGBA(image.Rect(0, 0, gs.CropRect.Dx(), gs.CropRect.Dy()))
+	draw.Src.Draw(crop, crop.Rect, gs.OriginalScreenshot, image.Point{X: gs.CropRect.Min.X, Y: gs.CropRect.Min.Y})
+	gs.Screenshot = crop
 }
 
 func main() {

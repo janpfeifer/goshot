@@ -11,7 +11,6 @@ import (
 	"github.com/janpfeifer/goshot/resources"
 	"image"
 	"image/color"
-	"image/draw"
 	"math"
 )
 
@@ -475,12 +474,8 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 
 // cropTopLeft will crop the screenshot on this position.
 func (vp *ViewPort) cropTopLeft(x, y int) {
-	fromRect := vp.gs.Screenshot.Rect
-	crop := image.NewRGBA(image.Rect(0, 0, fromRect.Dx()-x, fromRect.Dy()-y))
-	glog.V(2).Infof("cropTopLeft: new crop has size %+v", crop.Rect)
-	draw.Src.Draw(crop, crop.Rect, vp.gs.Screenshot, image.Point{X: x, Y: y})
-	vp.gs.Screenshot = crop
 	vp.gs.CropRect.Min = vp.gs.CropRect.Min.Add(image.Point{X: x, Y: y})
+	vp.gs.ApplyFilters()
 	vp.viewX, vp.viewY = 0, 0 // Move view to cropped corner.
 	glog.V(2).Infof("cropTopLeft: new cropRect is %+v", vp.gs.CropRect)
 	vp.postCrop()
@@ -488,11 +483,9 @@ func (vp *ViewPort) cropTopLeft(x, y int) {
 
 // cropBottomRight will crop the screenshot on this position.
 func (vp *ViewPort) cropBottomRight(x, y int) {
-	fromRect := vp.gs.Screenshot.Rect
-	crop := image.NewRGBA(image.Rect(0, 0, x, y))
-	draw.Src.Draw(crop, crop.Rect, vp.gs.Screenshot, image.Point{})
-	vp.gs.Screenshot = crop
-	vp.gs.CropRect.Max = vp.gs.CropRect.Max.Sub(image.Point{X: fromRect.Dx() - x, Y: fromRect.Dy() - y})
+	vp.gs.CropRect.Max = vp.gs.CropRect.Max.Sub(
+		image.Point{X: vp.gs.CropRect.Dx() - x, Y: vp.gs.CropRect.Dy() - y})
+	vp.gs.ApplyFilters()
 	vp.viewX, vp.viewY = x-vp.viewW, y-vp.viewH // Move view to cropped corner.
 	vp.postCrop()
 }
