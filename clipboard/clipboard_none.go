@@ -6,6 +6,6 @@ package clipboard
 
 import "errors"
 
-func CopyImage(content []byte) error {
+func CopyImage(img image.Image) error {
 	return errors.New("Clipboard image copy not implemented in this platform, sorry.")
 }

@@ -25,10 +25,14 @@ type GoShot struct {
 	App fyne.App
 	Win fyne.Window // Main window.
 
-	// Screenshot information
-	Screenshot, OriginalScreenshot *image.RGBA
-	ScreenshotTime                 time.Time
-	Crop                           image.Rectangle
+	// Original screenshot information
+	OriginalScreenshot *image.RGBA
+	ScreenshotTime     time.Time
+
+	// Edited screenshot
+	Screenshot *image.RGBA // The edited/composed screenshot
+	CropRect   image.Rectangle
+	Filters    []Filter // Configured filters: each filter is one edition to the image.
 
 	// UI elements
 	zoomEntry      *widget.Entry
@@ -36,6 +40,18 @@ type GoShot struct {
 	viewPort       *ViewPort
 	viewPortScroll *container.Scroll
 	miniMap        *MiniMap
+}
+
+type Filter interface {
+	// Apply filter, shifted (dx, dy) pixels -- e.g. if a filter draws a circle on
+	// top of the image, it should add (dx, dy) to the circle center.
+	Apply(image image.Image, dx, dy int) image.Image
+}
+
+// ApplyFilters will apply `Filters` to the `CropRect` of the original image
+// and regenerate Screenshot.
+func (gs *GoShot) ApplyFilters() {
+
 }
 
 func main() {
@@ -63,7 +79,7 @@ func (gs *GoShot) MakeScreenshot() error {
 	}
 	gs.OriginalScreenshot = gs.Screenshot
 	gs.ScreenshotTime = time.Now()
-	gs.Crop = gs.Screenshot.Bounds()
+	gs.CropRect = gs.Screenshot.Bounds()
 
 	glog.V(2).Infof("Screenshot captured bounds: %+v\n", bounds)
 	return nil

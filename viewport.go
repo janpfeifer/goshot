@@ -57,9 +57,6 @@ type ViewPort struct {
 	// Operations
 	currentOperation OperationType
 
-	// Crop position
-	cropRect image.Rectangle
-
 	fyne.ShortcutHandler
 }
 
@@ -86,7 +83,6 @@ var (
 func NewViewPort(gs *GoShot) (vp *ViewPort) {
 	vp = &ViewPort{
 		gs:                    gs,
-		cropRect:              gs.OriginalScreenshot.Rect,
 		cursorCropTopLeft:     canvas.NewImageFromResource(resources.CropTopLeft),
 		cursorCropBottomRight: canvas.NewImageFromResource(resources.CropBottomRight),
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
@@ -484,9 +480,9 @@ func (vp *ViewPort) cropTopLeft(x, y int) {
 	glog.V(2).Infof("cropTopLeft: new crop has size %+v", crop.Rect)
 	draw.Src.Draw(crop, crop.Rect, vp.gs.Screenshot, image.Point{X: x, Y: y})
 	vp.gs.Screenshot = crop
-	vp.cropRect.Min = vp.cropRect.Min.Add(image.Point{X: x, Y: y})
+	vp.gs.CropRect.Min = vp.gs.CropRect.Min.Add(image.Point{X: x, Y: y})
 	vp.viewX, vp.viewY = 0, 0 // Move view to cropped corner.
-	glog.V(2).Infof("cropTopLeft: new cropRect is %+v", vp.cropRect)
+	glog.V(2).Infof("cropTopLeft: new cropRect is %+v", vp.gs.CropRect)
 	vp.postCrop()
 }
 
@@ -496,29 +492,29 @@ func (vp *ViewPort) cropBottomRight(x, y int) {
 	crop := image.NewRGBA(image.Rect(0, 0, x, y))
 	draw.Src.Draw(crop, crop.Rect, vp.gs.Screenshot, image.Point{})
 	vp.gs.Screenshot = crop
-	vp.cropRect.Max = vp.cropRect.Max.Sub(image.Point{X: fromRect.Dx() - x, Y: fromRect.Dy() - y})
+	vp.gs.CropRect.Max = vp.gs.CropRect.Max.Sub(image.Point{X: fromRect.Dx() - x, Y: fromRect.Dy() - y})
 	vp.viewX, vp.viewY = x-vp.viewW, y-vp.viewH // Move view to cropped corner.
 	vp.postCrop()
 }
 
 func (vp *ViewPort) cropReset() {
 	vp.gs.Screenshot = vp.gs.OriginalScreenshot
-	vp.viewX += vp.cropRect.Min.X
-	vp.viewY += vp.cropRect.Min.Y
-	vp.cropRect = vp.gs.Screenshot.Rect
+	vp.viewX += vp.gs.CropRect.Min.X
+	vp.viewY += vp.gs.CropRect.Min.Y
+	vp.gs.CropRect = vp.gs.Screenshot.Rect
 	vp.postCrop()
 	vp.gs.status.SetText(fmt.Sprintf("Reset to original screenshot of size %d x %d pixels.",
-		vp.cropRect.Dx(), vp.cropRect.Dy()))
+		vp.gs.CropRect.Dx(), vp.gs.CropRect.Dy()))
 }
 
 // postCrop refreshes elements after a change in crop.
 func (vp *ViewPort) postCrop() {
 	// Full image fits the view port in any of the dimensions, then we center the image.
-	if vp.cropRect.Dx() < vp.viewW {
-		vp.viewX = -(vp.viewW - vp.cropRect.Dx()) / 2
+	if vp.gs.CropRect.Dx() < vp.viewW {
+		vp.viewX = -(vp.viewW - vp.gs.CropRect.Dx()) / 2
 	}
-	if vp.cropRect.Dy() < vp.viewH {
-		vp.viewY = -(vp.viewH - vp.cropRect.Dy()) / 2
+	if vp.gs.CropRect.Dy() < vp.viewH {
+		vp.viewY = -(vp.viewH - vp.gs.CropRect.Dy()) / 2
 	}
 
 	vp.updateViewSize()
@@ -527,6 +523,6 @@ func (vp *ViewPort) postCrop() {
 	vp.gs.miniMap.updateViewPortRect()
 	vp.gs.miniMap.Refresh()
 	vp.gs.status.SetText(fmt.Sprintf("New crop: {%d, %d} - {%d, %d} of original screen, %d x %d pixels.",
-		vp.cropRect.Min.X, vp.cropRect.Min.Y, vp.cropRect.Max.X, vp.cropRect.Max.Y,
-		vp.cropRect.Dx(), vp.cropRect.Dy()))
+		vp.gs.CropRect.Min.X, vp.gs.CropRect.Min.Y, vp.gs.CropRect.Max.X, vp.gs.CropRect.Max.Y,
+		vp.gs.CropRect.Dx(), vp.gs.CropRect.Dy()))
 }
