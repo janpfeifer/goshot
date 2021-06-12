@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"fyne.io/fyne/v2"
@@ -9,7 +8,6 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"github.com/janpfeifer/goshot/clipboard"
 	"github.com/janpfeifer/goshot/resources"
-	"image/png"
 	"strconv"
 
 	//"fyne.io/fyne/v2/canvas"
@@ -197,9 +195,7 @@ func printShortcut(shortcut fyne.Shortcut) {
 
 func copyImageToClipboard(gs *GoShot) {
 	glog.V(2).Info("copyImageToClipboard")
-	var contentBuffer bytes.Buffer
-	png.Encode(&contentBuffer, gs.Screenshot)
-	err := clipboard.CopyImage(contentBuffer.Bytes())
+	err := clipboard.CopyImage(gs.Screenshot)
 	if err != nil {
 		glog.Errorf("Failed to copy to clipboard: %s", err)
 		gs.status.SetText(fmt.Sprintf("Failed to copy to clipboard: %s", err))

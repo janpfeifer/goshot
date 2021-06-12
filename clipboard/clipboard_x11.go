@@ -46,7 +46,11 @@ var (
 	currentContent        []byte
 )
 
-func CopyImage(content []byte) error {
+func CopyImage(img image.Image) error {
+	var contentBuffer bytes.Buffer
+	png.Encode(&contentBuffer, img)
+	content := contentBuffer.Bytes()
+
 	glog.V(2).Infof("copyImageToClipboard(%d bytes)", len(content))
 	clipboardOnce.Do(func() { initX11() })
 	if failure != nil {
