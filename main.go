@@ -33,7 +33,7 @@ type GoShot struct {
 	// Edited screenshot
 	Screenshot *image.RGBA // The edited/composed screenshot
 	CropRect   image.Rectangle
-	Filters    []Filter // Configured filters: each filter is one edition to the image.
+	Filters    []ImageFilter // Configured filters: each filter is one edition to the image.
 
 	// UI elements
 	zoomEntry      *widget.Entry
@@ -43,17 +43,22 @@ type GoShot struct {
 	miniMap        *MiniMap
 }
 
-type Filter interface {
+type ImageFilter interface {
 	// Apply filter, shifted (dx, dy) pixels -- e.g. if a filter draws a circle on
 	// top of the image, it should add (dx, dy) to the circle center.
-	Apply(image image.Image, dx, dy int) image.Image
+	Apply(image image.Image) image.Image
 }
 
 // ApplyFilters will apply `Filters` to the `CropRect` of the original image
 // and regenerate Screenshot.
 func (gs *GoShot) ApplyFilters() {
+	glog.V(2).Infof("ApplyFilters: %d filters", len(gs.Filters))
+	filteredImage := image.Image(gs.OriginalScreenshot)
+	for _, filter := range gs.Filters {
+		filteredImage = filter.Apply(filteredImage)
+	}
 	crop := image.NewRGBA(image.Rect(0, 0, gs.CropRect.Dx(), gs.CropRect.Dy()))
-	draw.Src.Draw(crop, crop.Rect, gs.OriginalScreenshot, image.Point{X: gs.CropRect.Min.X, Y: gs.CropRect.Min.Y})
+	draw.Src.Draw(crop, crop.Rect, filteredImage, image.Point{X: gs.CropRect.Min.X, Y: gs.CropRect.Min.Y})
 	gs.Screenshot = crop
 }
 

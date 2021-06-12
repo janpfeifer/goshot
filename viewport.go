@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
+	"github.com/janpfeifer/goshot/filters"
 	"github.com/janpfeifer/goshot/resources"
 	"image"
 	"image/color"
@@ -447,7 +448,7 @@ func (vp *ViewPort) SetOp(op OperationType) {
 }
 
 func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
-	glog.V(2).Infof("Tapped(pos=%+v), dragSkipTag=%v", ev.Position, vp.dragSkipTap)
+	glog.V(2).Infof("Tapped(pos=%+v, op=%d), dragSkipTag=%v", ev.Position, vp.currentOperation, vp.dragSkipTap)
 	if vp.dragSkipTap {
 		// End of a drag, we discard this tap.
 		vp.dragSkipTap = false
@@ -466,6 +467,16 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 		vp.cropTopLeft(screenshotX, screenshotY)
 	case CropBottomRight:
 		vp.cropBottomRight(screenshotX, screenshotY)
+	case DrawCircle:
+		glog.V(2).Infof("Tapped(): draw a circle centered at (%d, %d)", screenshotX, screenshotY)
+		circle := filters.NewCircle(image.Rectangle{
+			Min: image.Point{X: screenshotX - 10, Y: screenshotY - 10},
+			Max: image.Point{X: screenshotX + 10, Y: screenshotY + 10},
+		}, Yellow, 2.0)
+		vp.gs.Filters = append(vp.gs.Filters, circle)
+		vp.gs.ApplyFilters()
+		vp.renderCache()
+		vp.Refresh()
 	}
 
 	// After a tap
