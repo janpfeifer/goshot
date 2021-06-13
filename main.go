@@ -6,10 +6,12 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"github.com/janpfeifer/goshot/clipboard"
 	"github.com/janpfeifer/goshot/resources"
+	"image/color"
 	"image/draw"
 	"strconv"
 
@@ -122,6 +124,19 @@ var (
 	_ fyne.Tappable     = &tappableCanvasObject{}
 )
 
+func (gs *GoShot) colorPicker() {
+	glog.V(2).Infof("colorPicker():")
+	picker := dialog.NewColorPicker(
+		"Pick a Color", "Select color for edits",
+		func(c color.Color) {
+			gs.viewPort.DrawingColor = c
+			gs.colorSample.FillColor = c
+			gs.colorSample.Refresh()
+		},
+		gs.Win)
+	picker.Show()
+}
+
 func (gs *GoShot) BuildEditWindow() {
 	gs.Win = gs.App.NewWindow(fmt.Sprintf("GoShot: Screenshot at %s", gs.ScreenshotTime))
 
@@ -159,7 +174,7 @@ func (gs *GoShot) BuildEditWindow() {
 	circleButton.SetIcon(resources.DrawCircle)
 
 	gs.thicknessEntry = &widget.Entry{Validator: validation.NewRegexp(`\d`, "Must contain a number")}
-	gs.thicknessEntry.SetPlaceHolder("2.0")
+	gs.thicknessEntry.SetPlaceHolder(fmt.Sprintf("%g", gs.viewPort.Thickness))
 	gs.thicknessEntry.OnChanged = func(str string) {
 		glog.V(2).Infof("Thickness changed to %s", str)
 		val, err := strconv.ParseFloat(str, 64)
@@ -170,11 +185,10 @@ func (gs *GoShot) BuildEditWindow() {
 
 	gs.colorSample = canvas.NewRectangle(Red)
 	size1d := theme.IconInlineSize()
-	size := fyne.NewSize(size1d, size1d)
+	size := fyne.NewSize(3*size1d, size1d)
 	gs.colorSample.SetMinSize(size)
-	colorWrapper := MakeTappable(gs.colorSample, func() {
-		glog.V(2).Infof("color picker")
-	})
+	gs.colorSample.Resize(size)
+	colorWrapper := MakeTappable(gs.colorSample, func() { gs.colorPicker() })
 
 	gs.miniMap = NewMiniMap(gs, gs.viewPort)
 	toolBar := container.NewVBox(
@@ -189,9 +203,8 @@ func (gs *GoShot) BuildEditWindow() {
 		circleButton,
 		container.NewHBox(
 			widget.NewIcon(resources.Thickness), gs.thicknessEntry,
-			widget.NewButtonWithIcon("", resources.ColorWheel, func() {
-				glog.V(2).Infof("color picker")
-			}), colorWrapper.CanvasObject, // Use colorWrapper when MakeTappable is fixed.
+			widget.NewButtonWithIcon("", resources.ColorWheel, func() { gs.colorPicker() }),
+			colorWrapper.CanvasObject, // Use colorWrapper when MakeTappable is fixed.
 		),
 		widget.NewButton("Text (alt+t)", nil),
 	)

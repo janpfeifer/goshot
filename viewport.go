@@ -35,6 +35,9 @@ type ViewPort struct {
 	// Thickness of stroke drawing circles and arrows. Set by the correspoding UI element.
 	Thickness float64
 
+	// DrawingColor is used on all new drawing operation.
+	DrawingColor color.Color
+
 	// Are of the screenshot that is visible in the current window: these are the start (viewX, viewY)
 	// and sizes in gs.screenshot pixels -- each may be zoomed in/out when displaying.
 	viewX, viewY, viewW, viewH int
@@ -92,6 +95,8 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		cursorCropBottomRight: canvas.NewImageFromResource(resources.CropBottomRight),
 		cursorDrawCircle:      canvas.NewImageFromResource(resources.DrawCircle),
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
+		Thickness:             2.0,
+		DrawingColor:          Red,
 	}
 	go vp.consumeMouseMoveEvents()
 	vp.raster = canvas.NewRaster(vp.draw)
@@ -293,7 +298,7 @@ func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 			vp.currentCircle = filters.NewCircle(image.Rectangle{
 				Min: image.Point{X: startX, Y: startY},
 				Max: image.Point{X: startX + 5, Y: startY + 5},
-			}, Red, vp.Thickness)
+			}, vp.DrawingColor, vp.Thickness)
 			vp.gs.Filters = append(vp.gs.Filters, vp.currentCircle)
 			vp.gs.ApplyFilters()
 			vp.renderCache()
