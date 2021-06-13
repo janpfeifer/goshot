@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/theme"
 	"github.com/janpfeifer/goshot/clipboard"
 	"github.com/janpfeifer/goshot/resources"
 	"image/draw"
@@ -37,6 +39,7 @@ type GoShot struct {
 
 	// UI elements
 	zoomEntry, thicknessEntry *widget.Entry
+	colorSample               *canvas.Rectangle
 	status                    *widget.Label
 	viewPort                  *ViewPort
 	viewPortScroll            *container.Scroll
@@ -100,6 +103,16 @@ func (gs *GoShot) MakeScreenshot() error {
 	//fmt.Printf("#%d : %v \"%s\"\n", i, bounds, fileName)
 }
 
+type TappableContainer struct {
+	*fyne.Container
+	onTap func(event *fyne.PointEvent)
+}
+
+func (t TappableContainer) Tapped(ev *fyne.PointEvent) { t.onTap(ev) }
+
+// Compile time check that Tappable is implemented.
+var _ = fyne.Tappable(&TappableContainer{})
+
 func (gs *GoShot) BuildEditWindow() {
 	gs.Win = gs.App.NewWindow(fmt.Sprintf("GoShot: Screenshot at %s", gs.ScreenshotTime))
 
@@ -146,6 +159,17 @@ func (gs *GoShot) BuildEditWindow() {
 		}
 	}
 
+	gs.colorSample = canvas.NewRectangle(Red)
+	size1d := theme.IconInlineSize()
+	size := fyne.NewSize(size1d, size1d)
+	gs.colorSample.SetMinSize(size)
+	colorWrapper := TappableContainer{
+		Container: container.NewHBox(gs.colorSample),
+		onTap: func(_ *fyne.PointEvent) {
+			glog.V(2).Infof("color picker")
+		},
+	}
+
 	gs.miniMap = NewMiniMap(gs, gs.viewPort)
 	toolBar := container.NewVBox(
 		gs.miniMap,
@@ -159,6 +183,7 @@ func (gs *GoShot) BuildEditWindow() {
 		circleButton,
 		container.NewHBox(
 			widget.NewIcon(resources.Thickness), gs.thicknessEntry,
+			widget.NewLabel("Color"), colorWrapper,
 		),
 		widget.NewButton("Text (alt+t)", nil),
 	)
