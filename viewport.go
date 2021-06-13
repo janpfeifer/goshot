@@ -40,7 +40,7 @@ type ViewPort struct {
 
 	cursor                                   *canvas.Image
 	cursorCropTopLeft, cursorCropBottomRight *canvas.Image
-	cursorCircle                             *canvas.Image
+	cursorDrawCircle                         *canvas.Image
 
 	mouseIn         bool // Whether the mouse is over ViewPort.
 	mouseMoveEvents chan fyne.Position
@@ -85,6 +85,7 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		gs:                    gs,
 		cursorCropTopLeft:     canvas.NewImageFromResource(resources.CropTopLeft),
 		cursorCropBottomRight: canvas.NewImageFromResource(resources.CropBottomRight),
+		cursorDrawCircle:      canvas.NewImageFromResource(resources.DrawCircle),
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
 	}
 	go vp.consumeMouseMoveEvents()
@@ -503,6 +504,8 @@ func (vp *ViewPort) SetOp(op OperationType) {
 		vp.cursor.Resize(cursorSize)
 
 	case DrawCircle:
+		vp.cursor = vp.cursorDrawCircle
+		vp.cursor.Resize(cursorSize)
 		vp.gs.status.SetText("Click and drag to draw circle!")
 	}
 

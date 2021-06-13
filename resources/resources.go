@@ -18,3 +18,7 @@ var CropTopLeft = fyne.NewStaticResource("", embedCropTopLeft)
 //go:embed crop_bottom_right.png
 var embedCropBottomRight []byte
 var CropBottomRight = fyne.NewStaticResource("", embedCropBottomRight)
+
+//go:embed draw_circle.png
+var embedDrawCircle []byte
+var DrawCircle = fyne.NewStaticResource("", embedDrawCircle)

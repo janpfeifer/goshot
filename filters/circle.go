@@ -19,7 +19,7 @@ type Circle struct {
 	Color color.Color
 
 	// Thickness of the circle to be drawn.
-	Thickness int
+	Thickness float64
 
 	// Center is generated automatically.
 	Center Vec2
@@ -31,7 +31,7 @@ type Circle struct {
 // NewCircle creates a new circle (or ellipsis) filter. It draws
 // an ellipsis whose dimensions fit the given rectangle.
 // You must specify the color and the thickness of the circle to be drawn.
-func NewCircle(dim image.Rectangle, color color.Color, thickness int) *Circle {
+func NewCircle(dim image.Rectangle, color color.Color, thickness float64) *Circle {
 	c := &Circle{Color: color, Thickness: thickness}
 	c.SetDim(dim)
 	return c
@@ -46,8 +46,8 @@ func (c *Circle) SetDim(dim image.Rectangle) {
 		float64(c.Dim.Max.Y) - c.Center.Y(),
 	}
 	c.innerRadius = Vec2{
-		c.outerRadius.X() - float64(c.Thickness),
-		c.outerRadius.Y() - float64(c.Thickness),
+		c.outerRadius.X() - c.Thickness,
+		c.outerRadius.Y() - c.Thickness,
 	}
 }
 

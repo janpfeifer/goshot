@@ -133,6 +133,9 @@ func (gs *GoShot) BuildEditWindow() {
 	})
 	cropReset.SetIcon(resources.Reset)
 
+	circleButton := widget.NewButton("Circle (alt+c)", func() { gs.viewPort.SetOp(DrawCircle) })
+	circleButton.SetIcon(resources.DrawCircle)
+
 	gs.miniMap = NewMiniMap(gs, gs.viewPort)
 	toolBar := container.NewVBox(
 		gs.miniMap,
@@ -143,7 +146,7 @@ func (gs *GoShot) BuildEditWindow() {
 			cropReset,
 		),
 		widget.NewButton("Arrow (alt+a)", nil),
-		widget.NewButton("Circle (alt+c)", func() { gs.viewPort.SetOp(DrawCircle) }),
+		circleButton,
 		widget.NewButton("Text (alt+t)", nil),
 	)
 
