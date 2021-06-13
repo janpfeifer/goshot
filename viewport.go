@@ -56,7 +56,7 @@ type ViewPort struct {
 
 	// Operations
 	currentOperation OperationType
-
+	currentCircle    *filters.Circle // Circle being dragged, only used when currentOperation==DrawCircle.
 	fyne.ShortcutHandler
 }
 
@@ -274,12 +274,30 @@ func bgPattern(x, y int) color.RGBA {
 // Dragged implements fyne.Draggable
 func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 	if vp.dragEvents == nil {
+		glog.V(2).Infof("Dragged(): start new drag for Op=%d", vp.currentOperation)
 		// Create a channel to send dragEvents and start goroutine to consume them sequentially.
 		vp.dragEvents = make(chan *fyne.DragEvent, dragEventsQueue)
 		vp.dragStart = ev.Position
 		vp.dragStartViewX = vp.viewX
 		vp.dragStartViewY = vp.viewY
 		go vp.consumeDragEvents()
+
+		switch vp.currentOperation {
+		case NoOp, CropTopLeft, CropBottomRight:
+			// Drag the image around, nothing to do to start.
+		case DrawCircle:
+			startX, startY := vp.screenshotPos(vp.dragStart)
+			glog.V(2).Infof("Tapped(): draw a circle starting at (%d, %d)", startX, startY)
+			vp.currentCircle = filters.NewCircle(image.Rectangle{
+				Min: image.Point{X: startX, Y: startY},
+				Max: image.Point{X: startX + 5, Y: startY + 5},
+			}, Red, 2.0)
+			vp.gs.Filters = append(vp.gs.Filters, vp.currentCircle)
+			vp.gs.ApplyFilters()
+			vp.renderCache()
+			vp.Refresh()
+		}
+
 		return // No need to process first event.
 	}
 	vp.dragEvents <- ev
@@ -309,9 +327,6 @@ func (vp *ViewPort) consumeDragEvents() {
 				} else {
 					// New event arrived.
 					consumed++
-					if consumed%10 == 0 {
-						glog.Info("here")
-					}
 					ev = newEvent
 				}
 			default:
@@ -322,12 +337,25 @@ func (vp *ViewPort) consumeDragEvents() {
 			if ev.Position != prevDragPos {
 				prevDragPos = ev.Position
 				glog.V(2).Infof("consumeDragEvents(pos=%+v, consumed=%d)", ev.Position, consumed)
-				vp.dragViewDelta(ev.Position.Subtract(vp.dragStart))
+				vp.doDragThrottled(ev)
 			}
 		}
 	}
 	vp.dragStart = fyne.Position{}
 	glog.V(2).Info("consumeDragEvents(): done")
+}
+
+// doDragThrottled is called sequentially, dropping drag events in between each call. So
+// each time it is called with the latest DragEvent, dropping those that happened in between
+// the previous call.
+func (vp *ViewPort) doDragThrottled(ev *fyne.DragEvent) {
+	switch vp.currentOperation {
+	case NoOp, CropTopLeft, CropBottomRight:
+		// Drag the image around
+		vp.dragViewDelta(ev.Position.Subtract(vp.dragStart))
+	case DrawCircle:
+		vp.dragCircle(ev.Position)
+	}
 }
 
 func (vp *ViewPort) dragViewDelta(delta fyne.Position) {
@@ -342,12 +370,40 @@ func (vp *ViewPort) dragViewDelta(delta fyne.Position) {
 	vp.gs.miniMap.updateViewPortRect()
 }
 
+func (vp *ViewPort) dragCircle(toPos fyne.Position) {
+	if vp.currentCircle == nil {
+		glog.Errorf("dragCircle(): dragCircle event, but none has been started yet!?")
+	}
+	startX, startY := vp.screenshotPos(vp.dragStart)
+	startX += vp.gs.CropRect.Min.X
+	startY += vp.gs.CropRect.Min.Y
+	toX, toY := vp.screenshotPos(toPos)
+	toX += vp.gs.CropRect.Min.X
+	toY += vp.gs.CropRect.Min.Y
+	vp.currentCircle.SetDim(image.Rectangle{
+		Min: image.Point{X: startX, Y: startY},
+		Max: image.Point{X: toX, Y: toY},
+	}.Canon())
+	glog.V(2).Infof("dragCircle(): draw a circle in %+v", vp.currentCircle)
+	vp.gs.ApplyFilters()
+	vp.renderCache()
+	vp.Refresh()
+}
+
 // DragEnd implements fyne.Draggable
 func (vp *ViewPort) DragEnd() {
 	glog.V(2).Infof("DragEnd(), dragEvents=%v", vp.dragEvents != nil)
 	close(vp.dragEvents)
 	vp.dragEvents = nil
 	vp.dragSkipTap = true
+
+	switch vp.currentOperation {
+	case NoOp, CropTopLeft, CropBottomRight:
+		// Nothing to do
+	case DrawCircle:
+		vp.currentCircle = nil
+		vp.SetOp(NoOp)
+	}
 }
 
 // ===============================================================
@@ -436,6 +492,7 @@ func (vp *ViewPort) SetOp(op OperationType) {
 			vp.cursor = nil
 			vp.Refresh()
 		}
+		vp.gs.status.SetText("")
 
 	case CropTopLeft:
 		vp.cursor = vp.cursorCropTopLeft
@@ -447,6 +504,17 @@ func (vp *ViewPort) SetOp(op OperationType) {
 	}
 }
 
+// screenshotCoord returns the screenshot position for the given
+// position in the canvas.
+func (vp *ViewPort) screenshotPos(pos fyne.Position) (x, y int) {
+	size := vp.Size()
+	ratioX := pos.X / size.Width
+	ratioY := pos.Y / size.Height
+	x = int(ratioX*float32(vp.viewW) + float32(vp.viewX) + 0.5)
+	y = int(ratioY*float32(vp.viewH) + float32(vp.viewY) + 0.5)
+	return
+}
+
 func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 	glog.V(2).Infof("Tapped(pos=%+v, op=%d), dragSkipTag=%v", ev.Position, vp.currentOperation, vp.dragSkipTap)
 	if vp.dragSkipTap {
@@ -454,11 +522,7 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 		vp.dragSkipTap = false
 		return
 	}
-	size := vp.Size()
-	ratioX := ev.Position.X / size.Width
-	ratioY := ev.Position.Y / size.Height
-	screenshotX := int(ratioX*float32(vp.viewW) + float32(vp.viewX) + 0.5)
-	screenshotY := int(ratioY*float32(vp.viewH) + float32(vp.viewY) + 0.5)
+	screenshotX, screenshotY := vp.screenshotPos(ev.Position)
 
 	switch vp.currentOperation {
 	case NoOp:
@@ -468,15 +532,7 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 	case CropBottomRight:
 		vp.cropBottomRight(screenshotX, screenshotY)
 	case DrawCircle:
-		glog.V(2).Infof("Tapped(): draw a circle centered at (%d, %d)", screenshotX, screenshotY)
-		circle := filters.NewCircle(image.Rectangle{
-			Min: image.Point{X: screenshotX - 10, Y: screenshotY - 10},
-			Max: image.Point{X: screenshotX + 10, Y: screenshotY + 10},
-		}, Yellow, 2.0)
-		vp.gs.Filters = append(vp.gs.Filters, circle)
-		vp.gs.ApplyFilters()
-		vp.renderCache()
-		vp.Refresh()
+		vp.gs.status.SetText("You must drag to draw the circle.")
 	}
 
 	// After a tap
@@ -502,10 +558,10 @@ func (vp *ViewPort) cropBottomRight(x, y int) {
 }
 
 func (vp *ViewPort) cropReset() {
-	vp.gs.Screenshot = vp.gs.OriginalScreenshot
 	vp.viewX += vp.gs.CropRect.Min.X
 	vp.viewY += vp.gs.CropRect.Min.Y
-	vp.gs.CropRect = vp.gs.Screenshot.Rect
+	vp.gs.CropRect = vp.gs.OriginalScreenshot.Rect
+	vp.gs.ApplyFilters()
 	vp.postCrop()
 	vp.gs.status.SetText(fmt.Sprintf("Reset to original screenshot of size %d x %d pixels.",
 		vp.gs.CropRect.Dx(), vp.gs.CropRect.Dy()))

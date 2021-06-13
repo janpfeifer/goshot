@@ -32,7 +32,13 @@ type Circle struct {
 // an ellipsis whose dimensions fit the given rectangle.
 // You must specify the color and the thickness of the circle to be drawn.
 func NewCircle(dim image.Rectangle, color color.Color, thickness int) *Circle {
-	c := &Circle{Dim: dim, Color: color, Thickness: thickness}
+	c := &Circle{Color: color, Thickness: thickness}
+	c.SetDim(dim)
+	return c
+}
+
+func (c *Circle) SetDim(dim image.Rectangle) {
+	c.Dim = dim
 	center := c.Dim.Min.Add(c.Dim.Max).Div(2)
 	c.Center = Vec2{float64(center.X), float64(center.Y)}
 	c.outerRadius = Vec2{
@@ -43,7 +49,6 @@ func NewCircle(dim image.Rectangle, color color.Color, thickness int) *Circle {
 		c.outerRadius.X() - float64(c.Thickness),
 		c.outerRadius.Y() - float64(c.Thickness),
 	}
-	return c
 }
 
 // at is the function given to the filterImage object.

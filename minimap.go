@@ -44,6 +44,7 @@ var (
 )
 
 var (
+	Red         = color.RGBA{R: 255, G: 64, A: 64}
 	Yellow      = color.RGBA{R: 255, G: 255, A: 255}
 	Transparent = color.RGBA{}
 )
