@@ -1,6 +1,8 @@
 package filters
 
 import (
+	"fmt"
+	"github.com/golang/glog"
 	"image"
 	"image/color"
 	"math"
@@ -23,7 +25,13 @@ type Arrow struct {
 	rect image.Rectangle
 
 	rebaseMatrix mgl64.Mat3
+	vectorLength float64
 }
+
+const (
+	arrowHeadLengthFactor = 10.0
+	arrowHeadWidthFactor  = 6.0
+)
 
 // NewArrow creates a new Arrow (or ellipsis) filter. It draws
 // an ellipsis whose dimensions fit the given rectangle.
@@ -40,22 +48,33 @@ func (c *Arrow) SetPoints(from, to image.Point) {
 	}
 	c.From, c.To = from, to
 	c.rect = image.Rectangle{Min: from, Max: to}.Canon()
-	c.rect.Min.X -= int(c.Thickness + 0.99)
-	c.rect.Min.Y -= int(c.Thickness + 0.99)
-	c.rect.Max.X += int(c.Thickness + 0.99)
-	c.rect.Max.Y += int(c.Thickness + 0.99)
+	arrowHeadExtraPixels := int(arrowHeadWidthFactor*c.Thickness + 0.99)
+	c.rect.Min.X -= arrowHeadExtraPixels
+	c.rect.Min.Y -= arrowHeadExtraPixels
+	c.rect.Max.X += arrowHeadExtraPixels
+	c.rect.Max.Y += arrowHeadExtraPixels
 
 	// Calculate matrix that will rotate and translate a point
 	// relative to the segment from c.From to c.To, with origin in
 	// c.From.
 	delta := c.To.Sub(c.From)
-	vertex := mgl64.Vec2{float64(delta.X), float64(delta.Y)}
-	direction := vertex.Normalize()
+	vector := mgl64.Vec2{float64(delta.X), float64(delta.Y)}
+	c.vectorLength = vector.Len()
+	direction := vector.Mul(1.0 / c.vectorLength)
 	angle := math.Atan2(direction.Y(), direction.X())
+	glog.V(2).Infof("SetPoints(from=%v, to=%v): delta=%v, length=%.0f, angle=%5.1f",
+		from, to, delta, c.vectorLength, mgl64.RadToDeg(angle))
 
-	c.rebaseMatrix = mgl64.Translate2D(-vertex.X(), -vertex.Y())
-	c.rebaseMatrix = c.rebaseMatrix.Mul3(mgl64.HomogRotate2D(-angle))
+	c.rebaseMatrix = mgl64.HomogRotate2D(-angle)
+	c.rebaseMatrix = c.rebaseMatrix.Mul3(
+		mgl64.Translate2D(float64(-c.From.X), float64(-c.From.Y)))
+	fmt.Println(c.rebaseMatrix)
 }
+
+var (
+	Yellow = color.RGBA{R: 255, G: 255, A: 255}
+	Green  = color.RGBA{R: 80, G: 255, A: 80}
+)
 
 // at is the function given to the filterImage object.
 func (c *Arrow) at(x, y int, under color.Color) color.Color {
@@ -64,12 +83,41 @@ func (c *Arrow) at(x, y int, under color.Color) color.Color {
 	}
 
 	// Move to coordinates on the segment defined from c.From to c.To.
-	point := mgl64.Vec3{float64(x), float64(y), 1.0} // Homogeneous coordinates.
-	point = c.rebaseMatrix.Mul3x1(point)
-	if math.Abs(point.Y()) > c.Thickness {
+	homogPoint := mgl64.Vec3{float64(x), float64(y), 1.0} // Homogeneous coordinates.
+	if glog.V(3) {
+		if math.Abs(homogPoint.Y()-float64(c.To.Y)) < 2 || math.Abs(homogPoint.X()-float64(c.To.X)) < 2 {
+			return Yellow
+		}
+		if math.Abs(homogPoint.Y()-float64(c.From.Y)) < 2 || math.Abs(homogPoint.X()-float64(c.From.X)) < 2 {
+			return Yellow
+		}
+	}
+	homogPoint = c.rebaseMatrix.Mul3x1(homogPoint)
+	if glog.V(3) {
+		if math.Abs(homogPoint.Y()) < 3 {
+			return Green
+		}
+		if math.Abs(homogPoint.X()) < 1 {
+			return Green
+		}
+		if math.Abs(homogPoint.X()-c.vectorLength) < 1 {
+			return Green
+		}
+	}
+
+	if homogPoint.X() < 0 {
 		return under
 	}
-	return c.Color
+	if homogPoint.X() < c.vectorLength-arrowHeadLengthFactor*c.Thickness {
+		if math.Abs(homogPoint.Y()) < c.Thickness/2 {
+			return c.Color
+		}
+	} else {
+		if math.Abs(homogPoint.Y()) < (c.vectorLength-homogPoint.X())*arrowHeadWidthFactor/arrowHeadLengthFactor/2.0 {
+			return c.Color
+		}
+	}
+	return under
 }
 
 // Apply implements the ImageFilter interface.

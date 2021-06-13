@@ -95,7 +95,7 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		cursorCropTopLeft:     canvas.NewImageFromResource(resources.CropTopLeft),
 		cursorCropBottomRight: canvas.NewImageFromResource(resources.CropBottomRight),
 		cursorDrawCircle:      canvas.NewImageFromResource(resources.DrawCircle),
-		cursorDrawArrow:       canvas.NewImageFromResource(resources.DrawCircle),
+		cursorDrawArrow:       canvas.NewImageFromResource(resources.DrawArrow),
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
 		Thickness:             2.0,
 		DrawingColor:          Red,
@@ -412,6 +412,20 @@ func (vp *ViewPort) dragCircle(toPos fyne.Position) {
 	vp.Refresh()
 }
 
+func (vp *ViewPort) dragArrow(toPos fyne.Position) {
+	if vp.currentArrow == nil {
+		glog.Errorf("dragArrow(): dragArrow event, but none has been started yet!?")
+	}
+	toX, toY := vp.screenshotPos(toPos)
+	toX += vp.gs.CropRect.Min.X
+	toY += vp.gs.CropRect.Min.Y
+	vp.currentArrow.SetPoints(vp.currentArrow.From, image.Point{X: toX, Y: toY})
+	glog.V(2).Infof("dragArrow(): draw an arrow in %+v", vp.currentArrow)
+	vp.gs.ApplyFilters()
+	vp.renderCache()
+	vp.Refresh()
+}
+
 // DragEnd implements fyne.Draggable
 func (vp *ViewPort) DragEnd() {
 	glog.V(2).Infof("DragEnd(), dragEvents=%v", vp.dragEvents != nil)
@@ -422,8 +436,9 @@ func (vp *ViewPort) DragEnd() {
 	switch vp.currentOperation {
 	case NoOp, CropTopLeft, CropBottomRight:
 		// Nothing to do
-	case DrawCircle:
+	case DrawCircle, DrawArrow:
 		vp.currentCircle = nil
+		vp.currentArrow = nil
 		vp.SetOp(NoOp)
 	}
 }
@@ -500,7 +515,7 @@ func (vp *ViewPort) consumeMouseMoveEvents() {
 // ===============================================================
 // Implementation of operations on ViewPort
 // ===============================================================
-var cursorSize = fyne.NewSize(64, 64)
+var cursorSize = fyne.NewSize(32, 32)
 
 // SetOp changes the current op on the edit window. It interrupts any dragging event going on.
 func (vp *ViewPort) SetOp(op OperationType) {
@@ -528,8 +543,12 @@ func (vp *ViewPort) SetOp(op OperationType) {
 		vp.cursor = vp.cursorDrawCircle
 		vp.cursor.Resize(cursorSize)
 		vp.gs.status.SetText("Click and drag to draw circle!")
-	}
 
+	case DrawArrow:
+		vp.cursor = vp.cursorDrawArrow
+		vp.cursor.Resize(cursorSize)
+		vp.gs.status.SetText("Click and drag from start to end (point side) to draw an arrow!")
+	}
 }
 
 // screenshotCoord returns the screenshot position for the given

@@ -154,16 +154,16 @@ func (gs *GoShot) BuildEditWindow() {
 	gs.viewPort = NewViewPort(gs)
 
 	// Side toolbar.
-	cropTopLeft := widget.NewButton("", func() {
-		gs.status.SetText("Click on new top-left corner")
-		gs.viewPort.SetOp(CropTopLeft)
-	})
-	cropTopLeft.SetIcon(resources.CropTopLeft)
-	cropBottomRight := widget.NewButton("", func() {
-		gs.status.SetText("Click on new bottom-right corner")
-		gs.viewPort.SetOp(CropBottomRight)
-	})
-	cropBottomRight.SetIcon(resources.CropBottomRight)
+	cropTopLeft := widget.NewButtonWithIcon("", resources.CropTopLeft,
+		func() {
+			gs.status.SetText("Click on new top-left corner")
+			gs.viewPort.SetOp(CropTopLeft)
+		})
+	cropBottomRight := widget.NewButtonWithIcon("", resources.CropBottomRight,
+		func() {
+			gs.status.SetText("Click on new bottom-right corner")
+			gs.viewPort.SetOp(CropBottomRight)
+		})
 	cropReset := widget.NewButton("", func() {
 		gs.viewPort.cropReset()
 		gs.viewPort.SetOp(NoOp)
@@ -199,7 +199,8 @@ func (gs *GoShot) BuildEditWindow() {
 			cropBottomRight,
 			cropReset,
 		),
-		widget.NewButton("Arrow (alt+a)", nil),
+		widget.NewButtonWithIcon("Arrow (alt+a)", resources.DrawArrow,
+			func() { gs.viewPort.SetOp(DrawArrow) }),
 		circleButton,
 		container.NewHBox(
 			widget.NewIcon(resources.Thickness), gs.thicknessEntry,
@@ -266,7 +267,11 @@ func (gs *GoShot) BuildEditWindow() {
 			gs.viewPort.SetOp(DrawCircle)
 		})
 	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyT, desktop.AltModifier}, printShortcut)
-	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyA, desktop.AltModifier}, printShortcut)
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyA, desktop.AltModifier},
+		func(shortcut fyne.Shortcut) {
+			printShortcut(shortcut)
+			gs.viewPort.SetOp(DrawArrow)
+		})
 
 	gs.Win.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
 		if ev.Name == fyne.KeyEscape {
