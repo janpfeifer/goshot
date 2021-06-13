@@ -501,7 +501,11 @@ func (vp *ViewPort) SetOp(op OperationType) {
 	case CropBottomRight:
 		vp.cursor = vp.cursorCropBottomRight
 		vp.cursor.Resize(cursorSize)
+
+	case DrawCircle:
+		vp.gs.status.SetText("Click and drag to draw circle!")
 	}
+
 }
 
 // screenshotCoord returns the screenshot position for the given

@@ -104,11 +104,11 @@ func (gs *GoShot) BuildEditWindow() {
 	gs.Win = gs.App.NewWindow(fmt.Sprintf("GoShot: Screenshot at %s", gs.ScreenshotTime))
 
 	// Build menu.
-	menuFile := fyne.NewMenu("File") // fyne.NewMenuItem("Exit", func() { gsApp.Quit() } ),
+	menuFile := fyne.NewMenu("File") // Quit is added automatically.
 
 	menuShare := fyne.NewMenu("Share",
-		fyne.NewMenuItem("Copy (clipboard)", func() { copyImageToClipboard(gs) }),
-		fyne.NewMenuItem("GoogleDrive", func() { shareWithGoogleDrive() }),
+		fyne.NewMenuItem("Copy (ctrl+c)", func() { copyImageToClipboard(gs) }),
+		fyne.NewMenuItem("GoogleDrive (ctrl+d)", func() { shareWithGoogleDrive() }),
 	)
 	mainMenu := fyne.NewMainMenu(menuFile, menuShare)
 	gs.Win.SetMainMenu(mainMenu)
@@ -142,12 +142,9 @@ func (gs *GoShot) BuildEditWindow() {
 			cropBottomRight,
 			cropReset,
 		),
-		widget.NewButton("Arrow", nil),
-		widget.NewButton("Circle", func() {
-			gs.viewPort.SetOp(DrawCircle)
-			gs.status.SetText("Click and drag to draw circle!")
-		}),
-		widget.NewButton("Text", nil),
+		widget.NewButton("Arrow (alt+a)", nil),
+		widget.NewButton("Circle (alt+c)", func() { gs.viewPort.SetOp(DrawCircle) }),
+		widget.NewButton("Text (alt+t)", nil),
 	)
 
 	// Status bar with zoom control.
@@ -200,7 +197,11 @@ func (gs *GoShot) BuildEditWindow() {
 	gs.Win.Canvas().AddShortcut(
 		&fyne.ShortcutCopy{},
 		func(_ fyne.Shortcut) { copyImageToClipboard(gs) })
-	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyC, desktop.AltModifier}, printShortcut)
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyC, desktop.AltModifier},
+		func(shortcut fyne.Shortcut) {
+			printShortcut(shortcut)
+			gs.viewPort.SetOp(DrawCircle)
+		})
 	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyT, desktop.AltModifier}, printShortcut)
 	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyA, desktop.AltModifier}, printShortcut)
 
