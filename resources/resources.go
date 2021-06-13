@@ -41,3 +41,5 @@ var Colors = fyne.NewStaticResource("Colors", embedColors)
 //go:embed colorwheel.png
 var embedColorWheel []byte
 var ColorWheel = fyne.NewStaticResource("ColorWheel", embedColorWheel)
+
+var DrawText = ColorWheel

@@ -46,9 +46,9 @@ type ViewPort struct {
 	minSize fyne.Size
 	raster  *canvas.Raster
 
-	cursor                                   *canvas.Image
-	cursorCropTopLeft, cursorCropBottomRight *canvas.Image
-	cursorDrawCircle, cursorDrawArrow        *canvas.Image
+	cursor                                            *canvas.Image
+	cursorCropTopLeft, cursorCropBottomRight          *canvas.Image
+	cursorDrawCircle, cursorDrawArrow, cursorDrawText *canvas.Image
 
 	mouseIn         bool // Whether the mouse is over ViewPort.
 	mouseMoveEvents chan fyne.Position
@@ -77,7 +77,7 @@ const (
 	CropBottomRight
 	DrawCircle
 	DrawArrow
-	// DrawText
+	DrawText
 )
 
 // Ensure ViewPort implements the following interfaces.
@@ -96,6 +96,7 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		cursorCropBottomRight: canvas.NewImageFromResource(resources.CropBottomRight),
 		cursorDrawCircle:      canvas.NewImageFromResource(resources.DrawCircle),
 		cursorDrawArrow:       canvas.NewImageFromResource(resources.DrawArrow),
+		cursorDrawText:        canvas.NewImageFromResource(resources.DrawText),
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
 		Thickness:             2.0,
 		DrawingColor:          Red,
@@ -292,7 +293,7 @@ func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 		go vp.consumeDragEvents()
 
 		switch vp.currentOperation {
-		case NoOp, CropTopLeft, CropBottomRight:
+		case NoOp, CropTopLeft, CropBottomRight, DrawText:
 			// Drag the image around, nothing to do to start.
 		case DrawCircle:
 			startX, startY := vp.screenshotPos(vp.dragStart)
@@ -370,7 +371,7 @@ func (vp *ViewPort) consumeDragEvents() {
 // the previous call.
 func (vp *ViewPort) doDragThrottled(ev *fyne.DragEvent) {
 	switch vp.currentOperation {
-	case NoOp, CropTopLeft, CropBottomRight:
+	case NoOp, CropTopLeft, CropBottomRight, DrawText:
 		// Drag the image around
 		vp.dragViewDelta(ev.Position.Subtract(vp.dragStart))
 	case DrawCircle:
@@ -434,7 +435,7 @@ func (vp *ViewPort) DragEnd() {
 	vp.dragSkipTap = true
 
 	switch vp.currentOperation {
-	case NoOp, CropTopLeft, CropBottomRight:
+	case NoOp, CropTopLeft, CropBottomRight, DrawText:
 		// Nothing to do
 	case DrawCircle, DrawArrow:
 		vp.currentCircle = nil
@@ -548,6 +549,11 @@ func (vp *ViewPort) SetOp(op OperationType) {
 		vp.cursor = vp.cursorDrawArrow
 		vp.cursor.Resize(cursorSize)
 		vp.gs.status.SetText("Click and drag from start to end (point side) to draw an arrow!")
+
+	case DrawText:
+		vp.cursor = vp.cursorDrawText
+		vp.cursor.Resize(cursorSize)
+		vp.gs.status.SetText("Click to define center location of text.")
 	}
 }
 
@@ -578,8 +584,10 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 		vp.cropTopLeft(screenshotX, screenshotY)
 	case CropBottomRight:
 		vp.cropBottomRight(screenshotX, screenshotY)
-	case DrawCircle:
-		vp.gs.status.SetText("You must drag to draw the circle.")
+	case DrawCircle, DrawArrow:
+		vp.gs.status.SetText("You must drag to draw a arrow/circle.")
+	case DrawText:
+		textFilter := filters.NewText("")
 	}
 
 	// After a tap

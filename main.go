@@ -164,11 +164,10 @@ func (gs *GoShot) BuildEditWindow() {
 			gs.status.SetText("Click on new bottom-right corner")
 			gs.viewPort.SetOp(CropBottomRight)
 		})
-	cropReset := widget.NewButton("", func() {
+	cropReset := widget.NewButtonWithIcon("", resources.Reset, func() {
 		gs.viewPort.cropReset()
 		gs.viewPort.SetOp(NoOp)
 	})
-	cropReset.SetIcon(resources.Reset)
 
 	circleButton := widget.NewButton("Circle (alt+c)", func() { gs.viewPort.SetOp(DrawCircle) })
 	circleButton.SetIcon(resources.DrawCircle)
@@ -207,7 +206,7 @@ func (gs *GoShot) BuildEditWindow() {
 			widget.NewButtonWithIcon("", resources.ColorWheel, func() { gs.colorPicker() }),
 			colorWrapper.CanvasObject, // Use colorWrapper when MakeTappable is fixed.
 		),
-		widget.NewButton("Text (alt+t)", nil),
+		widget.NewButton("Text (alt+t)", func() { gs.viewPort.SetOp(DrawText) }),
 	)
 
 	// Status bar with zoom control.
