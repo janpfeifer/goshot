@@ -48,7 +48,7 @@ type ViewPort struct {
 
 	cursor                                   *canvas.Image
 	cursorCropTopLeft, cursorCropBottomRight *canvas.Image
-	cursorDrawCircle                         *canvas.Image
+	cursorDrawCircle, cursorDrawArrow        *canvas.Image
 
 	mouseIn         bool // Whether the mouse is over ViewPort.
 	mouseMoveEvents chan fyne.Position
@@ -65,6 +65,7 @@ type ViewPort struct {
 	// Operations
 	currentOperation OperationType
 	currentCircle    *filters.Circle // Circle being dragged, only used when currentOperation==DrawCircle.
+	currentArrow     *filters.Arrow  // Circle being dragged, only used when currentOperation==DrawCircle.
 	fyne.ShortcutHandler
 }
 
@@ -75,8 +76,8 @@ const (
 	CropTopLeft
 	CropBottomRight
 	DrawCircle
+	DrawArrow
 	// DrawText
-	// DrawArrow
 )
 
 // Ensure ViewPort implements the following interfaces.
@@ -94,6 +95,7 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		cursorCropTopLeft:     canvas.NewImageFromResource(resources.CropTopLeft),
 		cursorCropBottomRight: canvas.NewImageFromResource(resources.CropBottomRight),
 		cursorDrawCircle:      canvas.NewImageFromResource(resources.DrawCircle),
+		cursorDrawArrow:       canvas.NewImageFromResource(resources.DrawCircle),
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
 		Thickness:             2.0,
 		DrawingColor:          Red,
@@ -303,6 +305,17 @@ func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 			vp.gs.ApplyFilters()
 			vp.renderCache()
 			vp.Refresh()
+		case DrawArrow:
+			startX, startY := vp.screenshotPos(vp.dragStart)
+			glog.V(2).Infof("Tapped(): draw an arrow starting at (%d, %d)", startX, startY)
+			vp.currentArrow = filters.NewArrow(
+				image.Point{X: startX, Y: startY},
+				image.Point{X: startX + 1, Y: startY + 1},
+				vp.DrawingColor, vp.Thickness)
+			vp.gs.Filters = append(vp.gs.Filters, vp.currentArrow)
+			vp.gs.ApplyFilters()
+			vp.renderCache()
+			vp.Refresh()
 		}
 
 		return // No need to process first event.
@@ -362,6 +375,8 @@ func (vp *ViewPort) doDragThrottled(ev *fyne.DragEvent) {
 		vp.dragViewDelta(ev.Position.Subtract(vp.dragStart))
 	case DrawCircle:
 		vp.dragCircle(ev.Position)
+	case DrawArrow:
+		vp.dragArrow(ev.Position)
 	}
 }
 

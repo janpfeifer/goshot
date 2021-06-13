@@ -5,6 +5,12 @@ import (
 	"image/color"
 )
 
+// Vec2 if a vector of 2 float64s, X and Y.
+type Vec2 [2]float64
+
+func (v Vec2) X() float64 { return v[0] }
+func (v Vec2) Y() float64 { return v[1] }
+
 type filterImage struct {
 	source image.Image
 	atFn   func(x, y int, under color.Color) color.Color
