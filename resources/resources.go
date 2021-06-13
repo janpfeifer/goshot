@@ -1,6 +1,9 @@
 package resources
 
 // This file embeds all the resources used by the program.
+//
+// colorwheel.svg was copied and modified from wikimedia: "No machine-readable author provided.
+// MarianSigler assumed (based on copyright claims)., Public domain, via Wikimedia Commons"
 
 import (
 	_ "embed"
@@ -26,3 +29,11 @@ var DrawCircle = fyne.NewStaticResource("", embedDrawCircle)
 //go:embed thickness.png
 var embedThickness []byte
 var Thickness = fyne.NewStaticResource("Thickness", embedThickness)
+
+//go:embed colors.png
+var embedColors []byte
+var Colors = fyne.NewStaticResource("Colors", embedColors)
+
+//go:embed colorwheel.png
+var embedColorWheel []byte
+var ColorWheel = fyne.NewStaticResource("ColorWheel", embedColorWheel)

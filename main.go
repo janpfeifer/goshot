@@ -103,15 +103,24 @@ func (gs *GoShot) MakeScreenshot() error {
 	//fmt.Printf("#%d : %v \"%s\"\n", i, bounds, fileName)
 }
 
-type TappableContainer struct {
-	*fyne.Container
-	onTap func(event *fyne.PointEvent)
+// tappableCanvasObject makes it tappable, but also invisible !? Question posted
+// in https://github.com/fyne-io/fyne/issues/418
+type tappableCanvasObject struct {
+	fyne.CanvasObject
+	OnTapped func()
 }
 
-func (t TappableContainer) Tapped(ev *fyne.PointEvent) { t.onTap(ev) }
+func MakeTappable(canvas fyne.CanvasObject, onTapped func()) *tappableCanvasObject {
+	return &tappableCanvasObject{CanvasObject: canvas, OnTapped: onTapped}
+}
+
+func (t *tappableCanvasObject) Tapped(ev *fyne.PointEvent) { t.OnTapped() }
 
 // Compile time check that Tappable is implemented.
-var _ = fyne.Tappable(&TappableContainer{})
+var (
+	_ fyne.CanvasObject = &tappableCanvasObject{}
+	_ fyne.Tappable     = &tappableCanvasObject{}
+)
 
 func (gs *GoShot) BuildEditWindow() {
 	gs.Win = gs.App.NewWindow(fmt.Sprintf("GoShot: Screenshot at %s", gs.ScreenshotTime))
@@ -163,12 +172,9 @@ func (gs *GoShot) BuildEditWindow() {
 	size1d := theme.IconInlineSize()
 	size := fyne.NewSize(size1d, size1d)
 	gs.colorSample.SetMinSize(size)
-	colorWrapper := TappableContainer{
-		Container: container.NewHBox(gs.colorSample),
-		onTap: func(_ *fyne.PointEvent) {
-			glog.V(2).Infof("color picker")
-		},
-	}
+	colorWrapper := MakeTappable(gs.colorSample, func() {
+		glog.V(2).Infof("color picker")
+	})
 
 	gs.miniMap = NewMiniMap(gs, gs.viewPort)
 	toolBar := container.NewVBox(
@@ -183,7 +189,9 @@ func (gs *GoShot) BuildEditWindow() {
 		circleButton,
 		container.NewHBox(
 			widget.NewIcon(resources.Thickness), gs.thicknessEntry,
-			widget.NewLabel("Color"), colorWrapper,
+			widget.NewButtonWithIcon("", resources.ColorWheel, func() {
+				glog.V(2).Infof("color picker")
+			}), colorWrapper.CanvasObject, // Use colorWrapper when MakeTappable is fixed.
 		),
 		widget.NewButton("Text (alt+t)", nil),
 	)

@@ -5,7 +5,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
 	"github.com/janpfeifer/goshot/filters"
@@ -18,9 +17,10 @@ import (
 // ViewPort is our view port for the image being edited. It's a specialized widget
 // that will display the image according to zoom / window select.
 //
-// It is both a CanvasObject and a WidgetRenderer.
+// It is both a CanvasObject and a WidgetRenderer -- the abstractions in Fyne are
+// not clear, but when those were implemented it worked (mostly copy&paste code).
 //
-// Based on github.com/fyne-io/pixeledit
+// Loosely based on github.com/fyne-io/pixeledit
 type ViewPort struct {
 	widget.BaseWidget
 
@@ -137,10 +137,6 @@ func (vp *ViewPort) Objects() []fyne.CanvasObject {
 		return []fyne.CanvasObject{vp.raster}
 	}
 	return []fyne.CanvasObject{vp.raster, vp.cursor}
-}
-
-func (vp *ViewPort) BackgroundColor() color.Color {
-	return theme.BackgroundColor()
 }
 
 // PixelSize returns the size in pixels of the this CanvasObject, based on the last request to redraw.

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   version="1.1"
+   width="540"
+   height="540"
+   id="svg2"
+   sodipodi:docname="colorwheel.svg"
+   inkscape:export-filename="C:\Projects\goshot\resources\colorwheel.png"
+   inkscape:export-xdpi="49.07"
+   inkscape:export-ydpi="49.07"
+   inkscape:version="1.1 (c68e22c387, 2021-05-23)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <sodipodi:namedview
+     id="namedview1445"
+     pagecolor="#ffffff"
+     bordercolor="#111111"
+     borderopacity="1"
+     inkscape:pageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     showgrid="false"
+     inkscape:zoom="1.6166667"
+     inkscape:cx="142.57732"
+     inkscape:cy="269.69072"
+     inkscape:window-width="3840"
+     inkscape:window-height="2080"
+     inkscape:window-x="-11"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <defs
+     id="defs4" />
+  <metadata
+     id="metadata6">
+    <rdf:RDF>
+      <cc:Work>
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:creator>
+          <cc:Agent>
+            <dc:title>MarianSigler, mariansigler@gmail.com</dc:title>
+          </cc:Agent>
+        </dc:creator>
+        <cc:license
+           rdf:resource="http://web.resource.org/cc/PublicDomain" />
+        <dc:title />
+      </cc:Work>
+      <cc:License
+         rdf:about="http://web.resource.org/cc/PublicDomain">
+        <cc:permits
+           rdf:resource="http://web.resource.org/cc/Reproduction" />
+        <cc:permits
+           rdf:resource="http://web.resource.org/cc/Distribution" />
+        <cc:permits
+           rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
+        <cc:requires
+           rdf:resource="http://web.resource.org/cc/ShareAlike" />
+      </cc:License>
+    </rdf:RDF>
+  </metadata>
+  <path
+     d="m 511.48146,205.29524 c 11.90567,44.43259 11.90567,84.97693 0,129.40952 L 487.31476,349.3424 270,270 490.20449,192.09986 z"
+     id="path16"
+     style="fill:#fefe33" />
+  <path
+     d="m 334.70476,28.518543 c 44.43259,11.905676 79.54502,32.17785 112.07193,64.704761 L 447.40047,118.09589 270,270 313.06484,40.508134 z"
+     id="path20"
+     style="fill:#fb9902" />
+  <path
+     d="m 446.77669,93.223304 c 32.52692,32.526916 52.79909,67.639346 64.70477,112.071936 L 270,270 z"
+     id="path18"
+     style="fill:#fabc02" />
+  <path
+     d="M 93.223305,93.223305 C 125.75022,60.696393 160.86265,40.42422 205.29524,28.518543 L 231.20546,44.501656 270,270 92.739568,120.0571 z"
+     id="path28"
+     style="fill:#fe2712" />
+  <path
+     d="m 205.29524,28.518543 c 44.43259,-11.905676 84.97693,-11.905676 129.40952,0 L 270,270 z"
+     id="path22"
+     style="fill:#fd5308" />
+  <path
+     d="m 28.518543,334.70476 c -11.905676,-44.43259 -11.905676,-84.97693 0,-129.40952 L 56.311276,186.62718 270,270 55.854788,349.40527 z"
+     id="path26"
+     style="fill:#8601af" />
+  <path
+     d="M 28.518543,205.29524 C 40.424219,160.86265 60.696393,125.75022 93.223305,93.223305 L 270,270 z"
+     id="path30"
+     style="fill:#a7194b" />
+  <path
+     d="M 205.29524,511.48146 C 160.86265,499.57578 125.75022,479.30361 93.223305,446.7767 L 95.307837,418.58874 270,270 231.0453,499.70648 z"
+     id="path8"
+     style="fill:#0247fe" />
+  <path
+     d="M 93.223305,446.7767 C 60.696393,414.24978 40.42422,379.13735 28.518543,334.70476 L 270,270 z"
+     id="path24"
+     style="fill:#3d01a4" />
+  <path
+     d="m 446.7767,446.7767 c -32.52692,32.52691 -67.63935,52.79908 -112.07194,64.70476 L 310.45335,496.38826 270,270 446.04632,421.15701 z"
+     id="path12"
+     style="fill:#66b032" />
+  <path
+     d="m 334.70476,511.48146 c -44.43259,11.90567 -84.97693,11.90567 -129.40952,0 L 270,270 z"
+     id="path10"
+     style="fill:#0391ce" />
+  <path
+     d="M 511.48146,334.70476 C 499.57578,379.13735 479.30361,414.24978 446.7767,446.7767 L 270,270 511.48146,334.70476 z"
+     id="path14"
+     style="fill:#d0ea2b" />
+  <circle
+     cx="269.09277"
+     cy="268.90723"
+     r="36.888592"
+     id="circle32"
+     style="fill:#ffffff;stroke-width:0.239854" />
+</svg>
