@@ -28,8 +28,13 @@ type ViewPort struct {
 	gs *GoShot
 
 	// Geometry of what is being displayed:
-	// Log2Zoom is the log2 of the zoom multiplier, it's what we show to the user.
+	// Log2Zoom is the log2 of the zoom multiplier, it's what we show to the user. It
+	// is set by the "zoomEntry" field in the UI
 	Log2Zoom float64
+
+	// Thickness of stroke drawing circles and arrows. Set by the correspoding UI element.
+	Thickness float64
+
 	// Are of the screenshot that is visible in the current window: these are the start (viewX, viewY)
 	// and sizes in gs.screenshot pixels -- each may be zoomed in/out when displaying.
 	viewX, viewY, viewW, viewH int
@@ -292,7 +297,7 @@ func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 			vp.currentCircle = filters.NewCircle(image.Rectangle{
 				Min: image.Point{X: startX, Y: startY},
 				Max: image.Point{X: startX + 5, Y: startY + 5},
-			}, Red, 2.0)
+			}, Red, vp.Thickness)
 			vp.gs.Filters = append(vp.gs.Filters, vp.currentCircle)
 			vp.gs.ApplyFilters()
 			vp.renderCache()

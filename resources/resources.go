@@ -22,3 +22,7 @@ var CropBottomRight = fyne.NewStaticResource("", embedCropBottomRight)
 //go:embed draw_circle.png
 var embedDrawCircle []byte
 var DrawCircle = fyne.NewStaticResource("", embedDrawCircle)
+
+//go:embed thickness.png
+var embedThickness []byte
+var Thickness = fyne.NewStaticResource("Thickness", embedThickness)

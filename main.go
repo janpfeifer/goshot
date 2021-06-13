@@ -36,11 +36,11 @@ type GoShot struct {
 	Filters    []ImageFilter // Configured filters: each filter is one edition to the image.
 
 	// UI elements
-	zoomEntry      *widget.Entry
-	status         *widget.Label
-	viewPort       *ViewPort
-	viewPortScroll *container.Scroll
-	miniMap        *MiniMap
+	zoomEntry, thicknessEntry *widget.Entry
+	status                    *widget.Label
+	viewPort                  *ViewPort
+	viewPortScroll            *container.Scroll
+	miniMap                   *MiniMap
 }
 
 type ImageFilter interface {
@@ -136,6 +136,16 @@ func (gs *GoShot) BuildEditWindow() {
 	circleButton := widget.NewButton("Circle (alt+c)", func() { gs.viewPort.SetOp(DrawCircle) })
 	circleButton.SetIcon(resources.DrawCircle)
 
+	gs.thicknessEntry = &widget.Entry{Validator: validation.NewRegexp(`\d`, "Must contain a number")}
+	gs.thicknessEntry.SetPlaceHolder("2.0")
+	gs.thicknessEntry.OnChanged = func(str string) {
+		glog.V(2).Infof("Thickness changed to %s", str)
+		val, err := strconv.ParseFloat(str, 64)
+		if err == nil {
+			gs.viewPort.Thickness = val
+		}
+	}
+
 	gs.miniMap = NewMiniMap(gs, gs.viewPort)
 	toolBar := container.NewVBox(
 		gs.miniMap,
@@ -147,6 +157,9 @@ func (gs *GoShot) BuildEditWindow() {
 		),
 		widget.NewButton("Arrow (alt+a)", nil),
 		circleButton,
+		container.NewHBox(
+			widget.NewIcon(resources.Thickness), gs.thicknessEntry,
+		),
 		widget.NewButton("Text (alt+t)", nil),
 	)
 
@@ -170,6 +183,7 @@ func (gs *GoShot) BuildEditWindow() {
 	})
 	zoomReset.SetIcon(resources.Reset)
 	gs.status = widget.NewLabel(fmt.Sprintf("Image size: %s", gs.Screenshot.Bounds()))
+
 	statusBar := container.NewBorder(
 		nil,
 		nil,
