@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/validation"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
@@ -36,11 +36,12 @@ type ViewPort struct {
 	// is set by the "zoomEntry" field in the UI
 	Log2Zoom float64
 
-	// Thickness of stroke drawing circles and arrows. Set by the correspoding UI element.
+	// Thickness of stroke drawing circles and arrows. Set by the corresponding UI element.
 	Thickness float64
 
-	// DrawingColor is used on all new drawing operation.
-	DrawingColor color.Color
+	// DrawingColor is used on all new drawing operation. BackgroundColor is used
+	// for the background of text.
+	DrawingColor, BackgroundColor color.Color
 
 	// FontSize is the last used font size.
 	FontSize float64
@@ -108,6 +109,7 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		Thickness:             2.0,
 		FontSize:              32.0,
 		DrawingColor:          Red,
+		BackgroundColor: 	   Transparent,
 	}
 	go vp.consumeMouseMoveEvents()
 	vp.raster = canvas.NewRaster(vp.draw)
@@ -608,17 +610,28 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 
 func (vp *ViewPort) createTextFilter(center image.Point) {
 	textEntry := widget.NewMultiLineEntry()
+	textEntry.Resize(fyne.NewSize(400, 80))
 	fontSize := widget.NewEntry()
 	fontSize.SetText(fmt.Sprintf("%f", vp.FontSize))
 	fontSize.Validator = validation.NewRegexp(`\d`, "Must contain a number")
-	fillBackground := true
-	backgroundEntry := widget.NewCheckWithData("", binding.BindBool(&fillBackground))
+	picker := dialog.NewColorPicker(
+		"Pick a Color", "Select background color for text",
+		func(c color.Color) {
+			vp.BackgroundColor = c
+		},
+		vp.gs.Win)
+	backgroundEntry := container.NewHBox(
+		// Set color button.
+		widget.NewButtonWithIcon("", resources.ColorWheel, func() { picker.Show() }),
+		// No color button
+		widget.NewButtonWithIcon("", resources.Reset, func() { vp.BackgroundColor = Transparent } ),
+	)
 	items := []*widget.FormItem{
 		widget.NewFormItem("Text", textEntry),
 		widget.NewFormItem("Font size", fontSize),
 		widget.NewFormItem("Background", backgroundEntry),
 	}
-	dialog.ShowForm("Insert text", "Ok", "Cancel", items,
+	form := dialog.NewForm("Insert text", "Ok", "Cancel", items,
 		func(confirm bool) {
 			if confirm {
 				size, err := strconv.ParseFloat(fontSize.Text, 64)
@@ -628,11 +641,13 @@ func (vp *ViewPort) createTextFilter(center image.Point) {
 					return
 				}
 				vp.FontSize = size
-				textFilter := filters.NewText(textEntry.Text, center, vp.DrawingColor, size)
+				textFilter := filters.NewText(textEntry.Text, center, vp.DrawingColor, vp.BackgroundColor, size)
 				vp.gs.Filters = append(vp.gs.Filters, textFilter)
 				vp.gs.ApplyFilters(true)
 			}
 		}, vp.gs.Win)
+	form.Resize(fyne.NewSize(500, 300))
+	form.Show()
 }
 
 // cropTopLeft will crop the screenshot on this position.
