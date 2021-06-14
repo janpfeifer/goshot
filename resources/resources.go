@@ -30,6 +30,10 @@ var DrawCircle = fyne.NewStaticResource("", embedDrawCircle)
 var embedDrawArrow []byte
 var DrawArrow = fyne.NewStaticResource("", embedDrawArrow)
 
+//go:embed draw_text.png
+var embedDrawText []byte
+var DrawText = fyne.NewStaticResource("", embedDrawText)
+
 //go:embed thickness.png
 var embedThickness []byte
 var Thickness = fyne.NewStaticResource("Thickness", embedThickness)
@@ -41,5 +45,3 @@ var Colors = fyne.NewStaticResource("Colors", embedColors)
 //go:embed colorwheel.png
 var embedColorWheel []byte
 var ColorWheel = fyne.NewStaticResource("ColorWheel", embedColorWheel)
-
-var DrawText = ColorWheel

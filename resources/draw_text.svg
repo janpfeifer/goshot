@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="48"
+   height="48"
+   viewBox="0 0 480 480"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.1 (c68e22c387, 2021-05-23)"
+   sodipodi:docname="draw_text.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#111111"
+     borderopacity="1"
+     inkscape:pageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:document-units="px"
+     showgrid="true"
+     scale-x="10"
+     inkscape:lockguides="true"
+     inkscape:zoom="16.03"
+     inkscape:cx="59.107923"
+     inkscape:cy="33.905178"
+     inkscape:window-width="3840"
+     inkscape:window-height="2080"
+     inkscape:window-x="-11"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1">
+    <inkscape:grid
+       type="xygrid"
+       id="grid9"
+       spacingx="10" />
+  </sodipodi:namedview>
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:400px;line-height:1.25;font-family:Ti;-inkscape-font-specification:Ti;fill:#000000;fill-opacity:1;stroke:none;stroke-width:10"
+       x="68.827194"
+       y="336.27573"
+       id="text7017"><tspan
+         sodipodi:role="line"
+         id="tspan7015"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Ti;-inkscape-font-specification:Ti;stroke-width:10"
+         x="68.827194"
+         y="336.27573">T</tspan></text>
+    <rect
+       style="fill:#ff0000;fill-opacity:0.505747;stroke:#ff0000;stroke-width:5;stroke-miterlimit:4;stroke-dasharray:none"
+       id="rect10791"
+       width="30"
+       height="290"
+       x="290"
+       y="70" />
+  </g>
+</svg>

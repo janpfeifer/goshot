@@ -230,7 +230,8 @@ func (gs *GoShot) BuildEditWindow() {
 			widget.NewButtonWithIcon("", resources.ColorWheel, func() { gs.colorPicker() }),
 			colorWrapper.CanvasObject, // Use colorWrapper when MakeTappable is fixed.
 		),
-		widget.NewButton("Text (alt+t)", func() { gs.viewPort.SetOp(DrawText) }),
+		widget.NewButtonWithIcon("Text (alt+t)", resources.DrawText,
+			func() { gs.viewPort.SetOp(DrawText) }),
 	)
 
 	// Status bar with zoom control.
@@ -289,7 +290,11 @@ func (gs *GoShot) BuildEditWindow() {
 			printShortcut(shortcut)
 			gs.viewPort.SetOp(DrawCircle)
 		})
-	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyT, desktop.AltModifier}, printShortcut)
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyT, desktop.AltModifier},
+		func(shortcut fyne.Shortcut) {
+			printShortcut(shortcut)
+			gs.viewPort.SetOp(DrawText)
+		})
 	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyA, desktop.AltModifier},
 		func(shortcut fyne.Shortcut) {
 			printShortcut(shortcut)
