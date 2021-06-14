@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/data/validation"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
@@ -12,6 +15,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"strconv"
 )
 
 // ViewPort is our view port for the image being edited. It's a specialized widget
@@ -37,6 +41,9 @@ type ViewPort struct {
 
 	// DrawingColor is used on all new drawing operation.
 	DrawingColor color.Color
+
+	// FontSize is the last used font size.
+	FontSize float64
 
 	// Are of the screenshot that is visible in the current window: these are the start (viewX, viewY)
 	// and sizes in gs.screenshot pixels -- each may be zoomed in/out when displaying.
@@ -99,6 +106,7 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		cursorDrawText:        canvas.NewImageFromResource(resources.DrawText),
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
 		Thickness:             2.0,
+		FontSize:              32.0,
 		DrawingColor:          Red,
 	}
 	go vp.consumeMouseMoveEvents()
@@ -591,17 +599,40 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 	case DrawCircle, DrawArrow:
 		vp.gs.status.SetText("You must drag to draw a arrow/circle.")
 	case DrawText:
-		textFilter := vp.createTextFilter()
-		vp.gs.Filters = append(vp.gs.Filters, textFilter)
-		vp.gs.ApplyFilters(true)
+		vp.createTextFilter(screenshotPoint)
 	}
 
 	// After a tap
 	vp.SetOp(NoOp)
 }
 
-func (vp *ViewPort) createTextFilter() *filters.Text {
-	return filters.NewText("Hello Go!\nNext line ?", screenshotPoint, vp.DrawingColor, 32.0)
+func (vp *ViewPort) createTextFilter(center image.Point) {
+	textEntry := widget.NewMultiLineEntry()
+	fontSize := widget.NewEntry()
+	fontSize.SetText(fmt.Sprintf("%f", vp.FontSize))
+	fontSize.Validator = validation.NewRegexp(`\d`, "Must contain a number")
+	fillBackground := true
+	backgroundEntry := widget.NewCheckWithData("", binding.BindBool(&fillBackground))
+	items := []*widget.FormItem{
+		widget.NewFormItem("Text", textEntry),
+		widget.NewFormItem("Font size", fontSize),
+		widget.NewFormItem("Background", backgroundEntry),
+	}
+	dialog.ShowForm("Insert text", "Ok", "Cancel", items,
+		func(confirm bool) {
+			if confirm {
+				size, err := strconv.ParseFloat(fontSize.Text, 64)
+				if err != nil {
+					glog.Errorf("Error parsing the font size given: %q", fontSize.Text)
+					vp.gs.status.SetText(fmt.Sprintf("Error parsing the font size given: %q", fontSize.Text))
+					return
+				}
+				vp.FontSize = size
+				textFilter := filters.NewText(textEntry.Text, center, vp.DrawingColor, size)
+				vp.gs.Filters = append(vp.gs.Filters, textFilter)
+				vp.gs.ApplyFilters(true)
+			}
+		}, vp.gs.Win)
 }
 
 // cropTopLeft will crop the screenshot on this position.
