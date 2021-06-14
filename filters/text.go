@@ -39,11 +39,11 @@ type Text struct {
 // You must specify the color and the thickness of the Text to be drawn.
 func NewText(text string, center image.Point, color, background color.Color, size float64) *Text {
 	c := &Text{
-		Text:   text,
-		Center: center,
-		Color:  color,
+		Text:       text,
+		Center:     center,
+		Color:      color,
 		Background: background,
-		Size:   size}
+		Size:       size}
 
 	c.SetText(text)
 	return c
@@ -70,7 +70,7 @@ func (t *Text) SetText(text string) {
 	}
 
 	// Handle multi-line content.
-	margins := int((t.Size * DPI / 100.0) / 2.0 + 0.99)
+	margins := int((t.Size*DPI/100.0)/2.0 + 0.99)
 	lines := strings.Split(text, "\n")
 	var boundingRect image.Rectangle
 	for _, line := range lines {
@@ -99,14 +99,14 @@ func (t *Text) SetText(text string) {
 	// Draw lines.
 	for ii, line := range lines {
 		d.Dot = fixed.Point26_6{
-			X: fixed.Int26_6(margins*64),
+			X: fixed.Int26_6(margins * 64),
 			Y: fixed.Int26_6(((float64(ii+1) * (t.Size + float64(margins))) * 64))}
 		d.DrawString(line)
 	}
 
 	normalizeAlpha(t.renderedText)
 
-	cx, cy := t.Center.Y, t.Center.Y
+	cx, cy := t.Center.X, t.Center.Y
 	dx, dy := t.renderedText.Rect.Dx(), t.renderedText.Rect.Dy()
 	t.rect = image.Rect(cx-dx/2, cy-dy/2, cx+dx/2, cy+dy/2)
 }
@@ -130,6 +130,12 @@ var alphas = make(map[uint32]bool)
 
 // at is the function given to the filterImage object.
 func (t *Text) at(x, y int, under color.Color) color.Color {
+	if glog.V(3) {
+		// Debug: draw cross lines in center.
+		if x == t.Center.X || y == t.Center.Y {
+			return t.Color
+		}
+	}
 	if x > t.rect.Max.X || x < t.rect.Min.X || y > t.rect.Max.Y || y < t.rect.Min.Y {
 		return under
 	}

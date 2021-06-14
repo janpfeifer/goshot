@@ -109,7 +109,7 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		Thickness:             2.0,
 		FontSize:              32.0,
 		DrawingColor:          Red,
-		BackgroundColor: 	   Transparent,
+		BackgroundColor:       Transparent,
 	}
 	go vp.consumeMouseMoveEvents()
 	vp.raster = canvas.NewRaster(vp.draw)
@@ -453,6 +453,7 @@ func (vp *ViewPort) DragEnd() {
 	case DrawCircle, DrawArrow:
 		vp.currentCircle = nil
 		vp.currentArrow = nil
+		vp.gs.status.SetText("Drawing done, use Control+Z to undo.")
 		vp.SetOp(NoOp)
 	}
 }
@@ -543,7 +544,6 @@ func (vp *ViewPort) SetOp(op OperationType) {
 			vp.cursor = nil
 			vp.Refresh()
 		}
-		vp.gs.status.SetText("")
 
 	case CropTopLeft:
 		vp.cursor = vp.cursorCropTopLeft
@@ -609,29 +609,40 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 }
 
 func (vp *ViewPort) createTextFilter(center image.Point) {
+	var form dialog.Dialog
 	textEntry := widget.NewMultiLineEntry()
 	textEntry.Resize(fyne.NewSize(400, 80))
 	fontSize := widget.NewEntry()
 	fontSize.SetText(fmt.Sprintf("%f", vp.FontSize))
 	fontSize.Validator = validation.NewRegexp(`\d`, "Must contain a number")
+	bgColorRect := canvas.NewRectangle(vp.BackgroundColor)
+	bgColorRect.SetMinSize(fyne.NewSize(200, 20))
 	picker := dialog.NewColorPicker(
 		"Pick a Color", "Select background color for text",
 		func(c color.Color) {
 			vp.BackgroundColor = c
+			bgColorRect.FillColor = vp.BackgroundColor
+			bgColorRect.Refresh()
+			form.Refresh()
 		},
 		vp.gs.Win)
 	backgroundEntry := container.NewHBox(
 		// Set color button.
 		widget.NewButtonWithIcon("", resources.ColorWheel, func() { picker.Show() }),
 		// No color button
-		widget.NewButtonWithIcon("", resources.Reset, func() { vp.BackgroundColor = Transparent } ),
+		widget.NewButtonWithIcon("", resources.Reset, func() {
+			vp.BackgroundColor = Transparent
+			bgColorRect.FillColor = vp.BackgroundColor
+			bgColorRect.Refresh()
+		}),
+		bgColorRect,
 	)
 	items := []*widget.FormItem{
 		widget.NewFormItem("Text", textEntry),
 		widget.NewFormItem("Font size", fontSize),
 		widget.NewFormItem("Background", backgroundEntry),
 	}
-	form := dialog.NewForm("Insert text", "Ok", "Cancel", items,
+	form = dialog.NewForm("Insert text", "Ok", "Cancel", items,
 		func(confirm bool) {
 			if confirm {
 				size, err := strconv.ParseFloat(fontSize.Text, 64)
@@ -644,10 +655,12 @@ func (vp *ViewPort) createTextFilter(center image.Point) {
 				textFilter := filters.NewText(textEntry.Text, center, vp.DrawingColor, vp.BackgroundColor, size)
 				vp.gs.Filters = append(vp.gs.Filters, textFilter)
 				vp.gs.ApplyFilters(true)
+				vp.gs.status.SetText("Text drawn, use Control+Z to undo.")
 			}
 		}, vp.gs.Win)
 	form.Resize(fyne.NewSize(500, 300))
 	form.Show()
+	vp.gs.Win.Canvas().Focus(textEntry)
 }
 
 // cropTopLeft will crop the screenshot on this position.
