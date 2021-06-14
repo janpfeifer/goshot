@@ -42,14 +42,13 @@ func CopyImage(img image.Image) error {
 	glog.V(2).Infof("CopyImage(bounds=%+v)", img.Bounds())
 
 	// CF_DIBV5 version
-	hBitmap, bitmapHeader, bitmapBits, err := hBitmapV5FromImage(img)
+	_, bitmapHeader, bitmapBits, err := hBitmapFromImage(img, false)
 	if err != nil {
 		return err
 	}
 	glog.V(2).Infof("sizeof(BITMAPV5HEADER)=%d", unsafe.Sizeof(*bitmapHeader))
 	glog.V(2).Infof("sizeof(BITMAPINFOHEADER)=%d", unsafe.Sizeof(bitmapHeader.BITMAPINFOHEADER))
 	dibV5Data, err := bitmapToGlobalAlloc(&bitmapHeader.BITMAPINFOHEADER, bitmapBits)
-	win.GlobalFree(win.HGLOBAL(hBitmap))
 	if err != nil {
 		return err
 	}
@@ -87,8 +86,8 @@ func CopyImage(img image.Image) error {
 	}
 
 	err = safeSetClipboardData([]formatAndData{
-		//{ Format: win.CF_DIB, Data: win.HANDLE(dibData) },
-		{Format: win.CF_DIBV5, Data: win.HANDLE(dibV5Data)},
+		{Format: win.CF_DIB, Data: win.HANDLE(dibV5Data)},
+		//{Format: win.CF_DIBV5, Data: win.HANDLE(dibV5Data)},  // Chromium (Chrome/Edge) does not support dibV5 :(
 		{RegisteredFormat: "PNG", Data: win.HANDLE(pngData)},
 		{RegisteredFormat: "HTML Format", Data: win.HANDLE(htmlData)},
 	})
@@ -120,17 +119,17 @@ func safeSetClipboardData(formats []formatAndData) error {
 	if err != nil {
 		return err
 	}
-	glog.V(2).Infof("safeSetClipboardData: clipboard opened.")
+	glog.V(2).Info("- clipboard opened.")
 	defer win.CloseClipboard()
 
 	if !win.EmptyClipboard() {
 		return errors.New("failed win.EmptyClipboard()")
 	}
-	glog.V(2).Infof("safeSetClipboardData: clipboard emptied.")
+	glog.V(2).Infof("- clipboard emptied.")
 
 	for _, fd := range formats {
 		var res win.HANDLE
-		glog.V(2).Infof("- setting %+v", fd)
+		glog.V(2).Infof("- setting %+v, handle=%016X", fd, fd.Data)
 		if fd.RegisteredFormat == "" {
 			res = win.SetClipboardData(fd.Format, fd.Data)
 		} else {
@@ -186,16 +185,15 @@ func bytesToGlobalAlloc(data *byte, length int) (win.HGLOBAL, error) {
 }
 
 // Creates a hBitmap V5 (DIBV5) bitmap.
-func hBitmapV5FromImage(im image.Image) (hBitmap win.HBITMAP, bitmapHeader *win.BITMAPV5HEADER, bitmapBits unsafe.Pointer, err error) {
+func hBitmapFromImage(im image.Image, v5 bool) (hBitmap win.HBITMAP, bitmapHeader *win.BITMAPV5HEADER, bitmapBits unsafe.Pointer, err error) {
 	bi := &win.BITMAPV5HEADER{
 		BITMAPV4HEADER: win.BITMAPV4HEADER{
 			BITMAPINFOHEADER: win.BITMAPINFOHEADER{
 				BiWidth:         int32(im.Bounds().Dx()),
-				BiHeight:        -int32(im.Bounds().Dy()), // Negative values means image is top-down (y=0 -> top pixels)
+				BiHeight:        int32(im.Bounds().Dy()), // Chrome doesn't support negative values.
 				BiPlanes:        1,
 				BiBitCount:      32,
 				BiCompression:   win.BI_BITFIELDS,
-				BiSizeImage:     uint32(im.Bounds().Dx() * im.Bounds().Dy() * 4), // Size in bytes.
 				BiXPelsPerMeter: 2834,
 				BiYPelsPerMeter: 2834,
 			},
@@ -210,7 +208,19 @@ func hBitmapV5FromImage(im image.Image) (hBitmap win.HBITMAP, bitmapHeader *win.
 			BV4CSType: LCS_WINDOWS_COLOR_SPACE,
 		},
 	}
-	bi.BiSize = uint32(unsafe.Sizeof(*bi)) // This size tells that this is a BITMAPV5HEADER.
+
+	pixelSizeBytes := 4
+	if v5 {
+		bi.BiSize = uint32(unsafe.Sizeof(*bi)) // This size tells that this is a BITMAPV5HEADER.
+	} else {
+		bi.BiSize = uint32(unsafe.Sizeof(bi.BITMAPINFOHEADER)) // This size tells that this is a BITMAPINFOHEADER.
+		//bi.BiBitCount = 24
+		//pixelSizeBytes = 3
+		bi.BiCompression = 0
+		bi.BiXPelsPerMeter = 0
+		bi.BiYPelsPerMeter = 0
+	}
+	bi.BiSizeImage = uint32(im.Bounds().Dx() * im.Bounds().Dy() * pixelSizeBytes) // Size in bytes.
 
 	hdc := win.GetDC(0)
 	defer win.ReleaseDC(0, hdc)
@@ -221,20 +231,23 @@ func hBitmapV5FromImage(im image.Image) (hBitmap win.HBITMAP, bitmapHeader *win.
 	case 0, win.ERROR_INVALID_PARAMETER:
 		return 0, nil, nil, errors.New("CreateDIBSection failed")
 	}
-	glog.V(2).Infof("header=%+v", bi)
-	glog.V(2).Infof("bitmapBits=%v", bitmapBits)
+	glog.V(2).Infof("- hBitmap=%016X", hBitmap)
+	glog.V(2).Infof("- header=%+v", bi)
+	glog.V(2).Infof("- bitmapBits=%v", bitmapBits)
 
 	// Fill the image
 	bitmapArray := (*[1 << 30]byte)(unsafe.Pointer(bitmapBits))
 	i := 0
-	for y := im.Bounds().Min.Y; y != im.Bounds().Max.Y; y++ {
+	for y := im.Bounds().Max.Y - 1; y >= 0; y-- {
 		for x := im.Bounds().Min.X; x != im.Bounds().Max.X; x++ {
 			r, g, b, a := im.At(x, y).RGBA()
-			bitmapArray[i+3] = byte(a >> 8)
+			if pixelSizeBytes == 4 {
+				bitmapArray[i+3] = byte(a >> 8)
+			}
 			bitmapArray[i+2] = byte(r >> 8)
 			bitmapArray[i+1] = byte(g >> 8)
 			bitmapArray[i+0] = byte(b >> 8)
-			i += 4
+			i += pixelSizeBytes
 		}
 	}
 
