@@ -303,9 +303,7 @@ func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 				Max: image.Point{X: startX + 5, Y: startY + 5},
 			}, vp.DrawingColor, vp.Thickness)
 			vp.gs.Filters = append(vp.gs.Filters, vp.currentCircle)
-			vp.gs.ApplyFilters()
-			vp.renderCache()
-			vp.Refresh()
+			vp.gs.ApplyFilters(false)
 		case DrawArrow:
 			startX, startY := vp.screenshotPos(vp.dragStart)
 			glog.V(2).Infof("Tapped(): draw an arrow starting at (%d, %d)", startX, startY)
@@ -314,9 +312,7 @@ func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 				image.Point{X: startX + 1, Y: startY + 1},
 				vp.DrawingColor, vp.Thickness)
 			vp.gs.Filters = append(vp.gs.Filters, vp.currentArrow)
-			vp.gs.ApplyFilters()
-			vp.renderCache()
-			vp.Refresh()
+			vp.gs.ApplyFilters(false)
 		}
 
 		return // No need to process first event.
@@ -408,7 +404,7 @@ func (vp *ViewPort) dragCircle(toPos fyne.Position) {
 		Max: image.Point{X: toX, Y: toY},
 	}.Canon())
 	glog.V(2).Infof("dragCircle(): draw a circle in %+v", vp.currentCircle)
-	vp.gs.ApplyFilters()
+	vp.gs.ApplyFilters(false)
 	vp.renderCache()
 	vp.Refresh()
 }
@@ -422,7 +418,7 @@ func (vp *ViewPort) dragArrow(toPos fyne.Position) {
 	toY += vp.gs.CropRect.Min.Y
 	vp.currentArrow.SetPoints(vp.currentArrow.From, image.Point{X: toX, Y: toY})
 	glog.V(2).Infof("dragArrow(): draw an arrow in %+v", vp.currentArrow)
-	vp.gs.ApplyFilters()
+	vp.gs.ApplyFilters(false)
 	vp.renderCache()
 	vp.Refresh()
 }
@@ -431,6 +427,13 @@ func (vp *ViewPort) dragArrow(toPos fyne.Position) {
 func (vp *ViewPort) DragEnd() {
 	glog.V(2).Infof("DragEnd(), dragEvents=%v", vp.dragEvents != nil)
 	close(vp.dragEvents)
+
+	switch vp.currentOperation {
+	case NoOp, CropTopLeft, CropBottomRight, DrawText:
+		// Drag the image around, nothing to do to start.
+	case DrawCircle, DrawArrow:
+		vp.gs.ApplyFilters(true)
+	}
 	vp.dragEvents = nil
 	vp.dragSkipTap = true
 
@@ -576,6 +579,7 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 		return
 	}
 	screenshotX, screenshotY := vp.screenshotPos(ev.Position)
+	screenshotPoint := image.Point{X: screenshotX, Y: screenshotY}
 
 	switch vp.currentOperation {
 	case NoOp:
@@ -587,17 +591,23 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 	case DrawCircle, DrawArrow:
 		vp.gs.status.SetText("You must drag to draw a arrow/circle.")
 	case DrawText:
-		textFilter := filters.NewText("")
+		textFilter := vp.createTextFilter()
+		vp.gs.Filters = append(vp.gs.Filters, textFilter)
+		vp.gs.ApplyFilters(true)
 	}
 
 	// After a tap
 	vp.SetOp(NoOp)
 }
 
+func (vp *ViewPort) createTextFilter() *filters.Text {
+	return filters.NewText("Hello Go!\nNext line ?", screenshotPoint, vp.DrawingColor, 32.0)
+}
+
 // cropTopLeft will crop the screenshot on this position.
 func (vp *ViewPort) cropTopLeft(x, y int) {
 	vp.gs.CropRect.Min = vp.gs.CropRect.Min.Add(image.Point{X: x, Y: y})
-	vp.gs.ApplyFilters()
+	vp.gs.ApplyFilters(true)
 	vp.viewX, vp.viewY = 0, 0 // Move view to cropped corner.
 	glog.V(2).Infof("cropTopLeft: new cropRect is %+v", vp.gs.CropRect)
 	vp.postCrop()
@@ -607,7 +617,7 @@ func (vp *ViewPort) cropTopLeft(x, y int) {
 func (vp *ViewPort) cropBottomRight(x, y int) {
 	vp.gs.CropRect.Max = vp.gs.CropRect.Max.Sub(
 		image.Point{X: vp.gs.CropRect.Dx() - x, Y: vp.gs.CropRect.Dy() - y})
-	vp.gs.ApplyFilters()
+	vp.gs.ApplyFilters(true)
 	vp.viewX, vp.viewY = x-vp.viewW, y-vp.viewH // Move view to cropped corner.
 	vp.postCrop()
 }
@@ -616,7 +626,7 @@ func (vp *ViewPort) cropReset() {
 	vp.viewX += vp.gs.CropRect.Min.X
 	vp.viewY += vp.gs.CropRect.Min.Y
 	vp.gs.CropRect = vp.gs.OriginalScreenshot.Rect
-	vp.gs.ApplyFilters()
+	vp.gs.ApplyFilters(true)
 	vp.postCrop()
 	vp.gs.status.SetText(fmt.Sprintf("Reset to original screenshot of size %d x %d pixels.",
 		vp.gs.CropRect.Dx(), vp.gs.CropRect.Dy()))

@@ -56,15 +56,39 @@ type ImageFilter interface {
 
 // ApplyFilters will apply `Filters` to the `CropRect` of the original image
 // and regenerate Screenshot.
-func (gs *GoShot) ApplyFilters() {
+// If full == true, regenerates full Screenshot. If false, renerates only
+// visible area.
+func (gs *GoShot) ApplyFilters(full bool) {
 	glog.V(2).Infof("ApplyFilters: %d filters", len(gs.Filters))
 	filteredImage := image.Image(gs.OriginalScreenshot)
 	for _, filter := range gs.Filters {
 		filteredImage = filter.Apply(filteredImage)
 	}
-	crop := image.NewRGBA(image.Rect(0, 0, gs.CropRect.Dx(), gs.CropRect.Dy()))
-	draw.Src.Draw(crop, crop.Rect, filteredImage, image.Point{X: gs.CropRect.Min.X, Y: gs.CropRect.Min.Y})
-	gs.Screenshot = crop
+
+	if gs.Screenshot == gs.OriginalScreenshot || gs.Screenshot.Rect.Dx() != gs.CropRect.Dx() || gs.Screenshot.Rect.Dy() != gs.CropRect.Dy() {
+		// Recreate image buffer.
+		crop := image.NewRGBA(image.Rect(0, 0, gs.CropRect.Dx(), gs.CropRect.Dy()))
+		gs.Screenshot = crop
+		full = true // Regenerate the full buffer.
+	}
+	if full {
+		draw.Src.Draw(gs.Screenshot, gs.Screenshot.Rect, filteredImage, gs.CropRect.Min)
+	} else {
+		var tgtRect image.Rectangle
+		tgtRect.Min = image.Point{X: gs.viewPort.viewX, Y: gs.viewPort.viewY}
+		tgtRect.Max = tgtRect.Min.Add(image.Point{X: gs.viewPort.viewW, Y: gs.viewPort.viewH})
+		srcPoint := gs.CropRect.Min.Add(tgtRect.Min)
+		draw.Src.Draw(gs.Screenshot, tgtRect, filteredImage, srcPoint)
+	}
+
+	if gs.viewPort != nil {
+		gs.viewPort.renderCache()
+		gs.viewPort.Refresh()
+	}
+	if gs.miniMap != nil {
+		gs.miniMap.renderCache()
+		gs.miniMap.Refresh()
+	}
 }
 
 func main() {
