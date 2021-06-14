@@ -1,7 +1,6 @@
 package filters
 
 import (
-	"fmt"
 	"github.com/golang/glog"
 	"image"
 	"image/color"
@@ -68,7 +67,6 @@ func (c *Arrow) SetPoints(from, to image.Point) {
 	c.rebaseMatrix = mgl64.HomogRotate2D(-angle)
 	c.rebaseMatrix = c.rebaseMatrix.Mul3(
 		mgl64.Translate2D(float64(-c.From.X), float64(-c.From.Y)))
-	fmt.Println(c.rebaseMatrix)
 }
 
 var (
