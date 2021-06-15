@@ -107,12 +107,13 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		cursorDrawText:        canvas.NewImageFromResource(resources.DrawText),
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
 		Thickness:             2.0,
-		FontSize:              32.0,
+		FontSize:              16.0,
 		DrawingColor:          Red,
 		BackgroundColor:       Transparent,
 	}
 	go vp.consumeMouseMoveEvents()
 	vp.raster = canvas.NewRaster(vp.draw)
+	vp.FontSize *= float64(gs.Win.Canvas().Scale())
 	return
 }
 
@@ -302,11 +303,14 @@ func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 		vp.dragStartViewY = vp.viewY
 		go vp.consumeDragEvents()
 
+		startX, startY := vp.screenshotPos(vp.dragStart)
+		startX += vp.gs.CropRect.Min.X
+		startY += vp.gs.CropRect.Min.Y
+
 		switch vp.currentOperation {
 		case NoOp, CropTopLeft, CropBottomRight, DrawText:
 			// Drag the image around, nothing to do to start.
 		case DrawCircle:
-			startX, startY := vp.screenshotPos(vp.dragStart)
 			glog.V(2).Infof("Tapped(): draw a circle starting at (%d, %d)", startX, startY)
 			vp.currentCircle = filters.NewCircle(image.Rectangle{
 				Min: image.Point{X: startX, Y: startY},
@@ -315,7 +319,6 @@ func (vp *ViewPort) Dragged(ev *fyne.DragEvent) {
 			vp.gs.Filters = append(vp.gs.Filters, vp.currentCircle)
 			vp.gs.ApplyFilters(false)
 		case DrawArrow:
-			startX, startY := vp.screenshotPos(vp.dragStart)
 			glog.V(2).Infof("Tapped(): draw an arrow starting at (%d, %d)", startX, startY)
 			vp.currentArrow = filters.NewArrow(
 				image.Point{X: startX, Y: startY},
@@ -590,6 +593,7 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 	}
 	screenshotX, screenshotY := vp.screenshotPos(ev.Position)
 	screenshotPoint := image.Point{X: screenshotX, Y: screenshotY}
+	absolutePoint := screenshotPoint.Add(vp.gs.CropRect.Min)
 
 	switch vp.currentOperation {
 	case NoOp:
@@ -601,7 +605,7 @@ func (vp *ViewPort) Tapped(ev *fyne.PointEvent) {
 	case DrawCircle, DrawArrow:
 		vp.gs.status.SetText("You must drag to draw a arrow/circle.")
 	case DrawText:
-		vp.createTextFilter(screenshotPoint)
+		vp.createTextFilter(absolutePoint)
 	}
 
 	// After a tap
