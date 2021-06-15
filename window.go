@@ -22,6 +22,7 @@ func (gs *GoShot) colorPicker() {
 		"Pick a Color", "Select color for edits",
 		func(c color.Color) {
 			gs.viewPort.DrawingColor = c
+			gs.viewPort.SetColorPreference(DrawingColorPreference, c)
 			gs.colorSample.FillColor = c
 			gs.colorSample.Refresh()
 		},
@@ -30,13 +31,15 @@ func (gs *GoShot) colorPicker() {
 }
 
 func (gs *GoShot) BuildEditWindow() {
-	gs.Win = gs.App.NewWindow(fmt.Sprintf("GoShot: Screenshot at %s", gs.ScreenshotTime))
+	gs.Win = gs.App.NewWindow(fmt.Sprintf("GoShot: screenshot @ %s", gs.ScreenshotTime.Format("2006-01-02 15:04:05")))
 
 	// Build menu.
-	menuFile := fyne.NewMenu("File") // Quit is added automatically.
+	menuFile := fyne.NewMenu("File",
+		fyne.NewMenuItem("Save (ctrl+s)", func() { gs.SaveImage() }),
+	) // Quit is added automatically.
 
 	menuShare := fyne.NewMenu("Share",
-		fyne.NewMenuItem("Copy (ctrl+c)", func() { copyImageToClipboard(gs) }),
+		fyne.NewMenuItem("Copy (ctrl+c)", func() { gs.CopyImageToClipboard() }),
 		fyne.NewMenuItem("GoogleDrive (ctrl+d)", func() { shareWithGoogleDrive() }),
 	)
 	mainMenu := fyne.NewMainMenu(menuFile, menuShare)
@@ -74,9 +77,9 @@ func (gs *GoShot) BuildEditWindow() {
 		}
 	}
 
-	gs.colorSample = canvas.NewRectangle(Red)
+	gs.colorSample = canvas.NewRectangle(gs.viewPort.DrawingColor)
 	size1d := theme.IconInlineSize()
-	size := fyne.NewSize(3*size1d, size1d)
+	size := fyne.NewSize(5*size1d, size1d)
 	gs.colorSample.SetMinSize(size)
 	gs.colorSample.Resize(size)
 
@@ -151,7 +154,7 @@ func (gs *GoShot) BuildEditWindow() {
 
 	gs.Win.Canvas().AddShortcut(
 		&fyne.ShortcutCopy{},
-		func(_ fyne.Shortcut) { copyImageToClipboard(gs) })
+		func(_ fyne.Shortcut) { gs.CopyImageToClipboard() })
 	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyC, desktop.AltModifier},
 		func(shortcut fyne.Shortcut) {
 			printShortcut(shortcut)
@@ -171,6 +174,11 @@ func (gs *GoShot) BuildEditWindow() {
 		func(shortcut fyne.Shortcut) {
 			printShortcut(shortcut)
 			gs.UndoLastFilter()
+		})
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyS, desktop.ControlModifier},
+		func(shortcut fyne.Shortcut) {
+			printShortcut(shortcut)
+			gs.SaveImage()
 		})
 
 	gs.Win.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {

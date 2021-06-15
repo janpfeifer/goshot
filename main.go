@@ -1,13 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/storage"
 	"github.com/janpfeifer/goshot/clipboard"
 	"image/draw"
+	"image/png"
+	"path"
+
 	//"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
@@ -129,8 +135,65 @@ func (gs *GoShot) UndoLastFilter() {
 	}
 }
 
-func copyImageToClipboard(gs *GoShot) {
-	glog.V(2).Info("copyImageToClipboard")
+// DefaultName retuns a default name to the screenshot, based on date/time it was made.
+func (gs *GoShot) DefaultName() string {
+	return fmt.Sprintf("Screenshot %s",
+		gs.ScreenshotTime.Format("2006-01-02 15-04-02"))
+}
+
+const DefaultPathPreference = "DefaultPath"
+
+// SaveImage opens a file save dialog box to save the currently edited screenshot.
+func (gs *GoShot) SaveImage() {
+	glog.V(2).Info("SaveImage")
+	var fileSave *dialog.FileDialog
+	fileSave = dialog.NewFileSave(
+		func(writer fyne.URIWriteCloser, err error) {
+			if err != nil {
+				glog.Errorf("Failed to save image: %s", err)
+				gs.status.SetText(fmt.Sprintf("Failed to save image: %s", err))
+				return
+			}
+			if writer == nil {
+				gs.status.SetText("Save file cancelled.")
+				return
+			}
+			glog.V(2).Infof("SaveImage(): URI=%s", writer.URI())
+			defer writer.Close()
+
+			// Always default to previous path used:
+			defaultPath := path.Dir(writer.URI().Path())
+			gs.App.Preferences().SetString(DefaultPathPreference, defaultPath)
+
+			var contentBuffer bytes.Buffer
+			png.Encode(&contentBuffer, gs.Screenshot)
+			content := contentBuffer.Bytes()
+			_, err = writer.Write(content)
+			if err != nil {
+				glog.Errorf("Failed to save image to %q: %s", writer.URI(), fileSave)
+				gs.status.SetText(fmt.Sprintf("Failed to save image to %q: %s", writer.URI(), err))
+				return
+			}
+			gs.status.SetText(fmt.Sprintf("Saved image to %q", writer.URI()))
+		}, gs.Win)
+	fileSave.SetFileName(gs.DefaultName() + ".png")
+	if defaultPath := gs.App.Preferences().String(DefaultPathPreference); defaultPath != "" {
+		lister, err := storage.ListerForURI(storage.NewFileURI(defaultPath))
+		if err == nil {
+			fileSave.SetLocation(lister)
+		} else {
+			glog.Warningf("Cannot create a ListableURI for %q", defaultPath)
+		}
+	}
+	size := gs.Win.Canvas().Size()
+	size.Width *= 0.90
+	size.Height *= 0.90
+	fileSave.Resize(size)
+	fileSave.Show()
+}
+
+func (gs *GoShot) CopyImageToClipboard() {
+	glog.V(2).Info("CopyImageToClipboard")
 	err := clipboard.CopyImage(gs.Screenshot)
 	if err != nil {
 		glog.Errorf("Failed to copy to clipboard: %s", err)

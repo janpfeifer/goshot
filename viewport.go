@@ -108,13 +108,41 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
 		Thickness:             2.0,
 		FontSize:              16.0,
-		DrawingColor:          Red,
-		BackgroundColor:       Transparent,
 	}
 	go vp.consumeMouseMoveEvents()
 	vp.raster = canvas.NewRaster(vp.draw)
 	vp.FontSize *= float64(gs.Win.Canvas().Scale())
+	vp.DrawingColor = vp.GetColorPreference(DrawingColorPreference, Red)
+	vp.BackgroundColor = vp.GetColorPreference(BackgroundColorPreference, Transparent)
 	return
+}
+
+const (
+	DrawingColorPreference    = "DrawingColor"
+	BackgroundColorPreference = "BackgroundColor"
+)
+
+// GetColorPreference returns the color set for the given key if it has been set.
+// Otherwise it returns `defaultColor`.
+func (vp *ViewPort) GetColorPreference(key string, defaultColor color.RGBA) color.RGBA {
+	isSet := vp.gs.App.Preferences().Bool(key)
+	if !isSet {
+		return defaultColor
+	}
+	r := vp.gs.App.Preferences().Int(key + "_R")
+	g := vp.gs.App.Preferences().Int(key + "_G")
+	b := vp.gs.App.Preferences().Int(key + "_B")
+	a := vp.gs.App.Preferences().Int(key + "_A")
+	return color.RGBA{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8), A: uint8(a >> 8)}
+}
+
+func (vp *ViewPort) SetColorPreference(key string, c color.Color) {
+	r, g, b, a := c.RGBA()
+	vp.gs.App.Preferences().SetInt(key+"_R", int(r))
+	vp.gs.App.Preferences().SetInt(key+"_G", int(g))
+	vp.gs.App.Preferences().SetInt(key+"_B", int(b))
+	vp.gs.App.Preferences().SetInt(key+"_A", int(a))
+	vp.gs.App.Preferences().SetBool(key, true)
 }
 
 func (vp *ViewPort) Resize(size fyne.Size) {
@@ -625,6 +653,7 @@ func (vp *ViewPort) createTextFilter(center image.Point) {
 		"Pick a Color", "Select background color for text",
 		func(c color.Color) {
 			vp.BackgroundColor = c
+			vp.SetColorPreference(BackgroundColorPreference, c)
 			bgColorRect.FillColor = vp.BackgroundColor
 			bgColorRect.Refresh()
 			form.Refresh()
