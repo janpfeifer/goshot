@@ -1,4 +1,4 @@
-package main
+package screenshot
 
 import (
 	"fyne.io/fyne/v2"

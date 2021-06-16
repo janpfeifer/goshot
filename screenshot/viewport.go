@@ -1,4 +1,4 @@
-package main
+package screenshot
 
 import (
 	"fmt"
@@ -114,10 +114,15 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 	vp.FontSize *= float64(gs.Win.Canvas().Scale())
 	vp.DrawingColor = vp.GetColorPreference(DrawingColorPreference, Red)
 	vp.BackgroundColor = vp.GetColorPreference(BackgroundColorPreference, Transparent)
+	vp.Thickness = vp.gs.App.Preferences().Float(ThicknessPreference)
+	if vp.Thickness == 0 {
+		vp.Thickness = 3.0 // Default value.
+	}
 	return
 }
 
 const (
+	ThicknessPreference       = "Thickness"
 	DrawingColorPreference    = "DrawingColor"
 	BackgroundColorPreference = "BackgroundColor"
 )

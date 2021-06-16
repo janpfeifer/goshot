@@ -1,4 +1,4 @@
-package main
+package screenshot
 
 import (
 	"fmt"
@@ -74,6 +74,7 @@ func (gs *GoShot) BuildEditWindow() {
 		val, err := strconv.ParseFloat(str, 64)
 		if err == nil {
 			gs.viewPort.Thickness = val
+			gs.App.Preferences().SetFloat(ThicknessPreference, val)
 		}
 	}
 
