@@ -16,22 +16,9 @@ import (
 	"strconv"
 )
 
-func (gs *GoShot) colorPicker() {
-	glog.V(2).Infof("colorPicker():")
-	picker := dialog.NewColorPicker(
-		"Pick a Color", "Select color for edits",
-		func(c color.Color) {
-			gs.viewPort.DrawingColor = c
-			gs.viewPort.SetColorPreference(DrawingColorPreference, c)
-			gs.colorSample.FillColor = c
-			gs.colorSample.Refresh()
-		},
-		gs.Win)
-	picker.Show()
-}
-
 func (gs *GoShot) BuildEditWindow() {
 	gs.Win = gs.App.NewWindow(fmt.Sprintf("GoShot: screenshot @ %s", gs.ScreenshotTime.Format("2006-01-02 15:04:05")))
+	gs.Win.SetIcon(resources.GoShotIconPng)
 
 	// Build menu.
 	menuFile := fyne.NewMenu("File",
@@ -192,6 +179,20 @@ func (gs *GoShot) BuildEditWindow() {
 			glog.V(2).Infof("KeyTyped: %+v", ev)
 		}
 	})
+}
+
+func (gs *GoShot) colorPicker() {
+	glog.V(2).Infof("colorPicker():")
+	picker := dialog.NewColorPicker(
+		"Pick a Color", "Select color for edits",
+		func(c color.Color) {
+			gs.viewPort.DrawingColor = c
+			gs.viewPort.SetColorPreference(DrawingColorPreference, c)
+			gs.colorSample.FillColor = c
+			gs.colorSample.Refresh()
+		},
+		gs.Win)
+	picker.Show()
 }
 
 func printShortcut(shortcut fyne.Shortcut) {
