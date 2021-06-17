@@ -2,9 +2,10 @@ package systray
 
 import (
 	glst "github.com/getlantern/systray"
-	"github.com/getlantern/systray/example/icon"
 	"github.com/golang/glog"
 	"github.com/janpfeifer/goshot/resources"
+	"os/exec"
+	"strings"
 )
 
 const appIconResID = 7
@@ -21,7 +22,6 @@ func Run() {
 	if len(PreParseArgs) == 0 {
 		glog.Fatal("systray.Run must be run after setting PreParseArgs.")
 	}
-	platformDependentInit()
 	glst.Run(onReady, onExit)
 }
 
@@ -34,10 +34,6 @@ func onReady() {
 	go handler(mScreenshot, onScreenshot)
 	mQuit := glst.AddMenuItem("Quit", "Quit the whole app")
 	go func() { <-mQuit.ClickedCh; glst.Quit() }()
-
-	// Sets the icon of a menu item. Only available on Mac and Windows.
-	mQuit.SetIcon(icon.Data)
-
 }
 
 func onExit() {
@@ -51,5 +47,22 @@ func handler(item *glst.MenuItem, onClick func()) {
 			return
 		}
 		onClick()
+	}
+}
+
+func onScreenshot() {
+	args := make([]string, 0, len(PreParseArgs))
+	for _, arg := range PreParseArgs {
+		if strings.Contains(arg, "systray") {
+			// Remove the -systray flag.
+			continue
+		}
+		args = append(args, arg)
+	}
+
+	err := exec.Command(args[0], args[1:]...).Start()
+	if err != nil {
+		glog.Errorf("Command attempted to execute: %v", args)
+		glog.Errorf("Failed to start GoShot to screenshot: %s", err)
 	}
 }
