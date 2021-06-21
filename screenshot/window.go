@@ -27,7 +27,7 @@ func (gs *GoShot) BuildEditWindow() {
 
 	menuShare := fyne.NewMenu("Share",
 		fyne.NewMenuItem("Copy (ctrl+c)", func() { gs.CopyImageToClipboard() }),
-		fyne.NewMenuItem("GoogleDrive (ctrl+d)", func() { shareWithGoogleDrive() }),
+		fyne.NewMenuItem("GoogleDrive (ctrl+g)", func() { gs.ShareWithGoogleDrive() }),
 	)
 	mainMenu := fyne.NewMainMenu(menuFile, menuShare)
 	gs.Win.SetMainMenu(mainMenu)
@@ -167,6 +167,11 @@ func (gs *GoShot) BuildEditWindow() {
 		func(shortcut fyne.Shortcut) {
 			printShortcut(shortcut)
 			gs.SaveImage()
+		})
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{fyne.KeyG, desktop.ControlModifier},
+		func(shortcut fyne.Shortcut) {
+			printShortcut(shortcut)
+			gs.ShareWithGoogleDrive()
 		})
 
 	gs.Win.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {

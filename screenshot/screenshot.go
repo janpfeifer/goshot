@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
 	"github.com/janpfeifer/goshot/clipboard"
+	"github.com/janpfeifer/goshot/googledrive"
 	"github.com/kbinani/screenshot"
 	"image"
 	"image/draw"
@@ -45,6 +46,9 @@ type GoShot struct {
 	viewPort                  *ViewPort
 	viewPortScroll            *container.Scroll
 	miniMap                   *MiniMap
+
+	// GoogleDrive manager
+	gdrive *googledrive.Manager
 }
 
 type ImageFilter interface {
@@ -145,7 +149,7 @@ const DefaultPathPreference = "DefaultPath"
 
 // SaveImage opens a file save dialog box to save the currently edited screenshot.
 func (gs *GoShot) SaveImage() {
-	glog.V(2).Info("SaveImage")
+	glog.V(2).Info("GoShot.SaveImage")
 	var fileSave *dialog.FileDialog
 	fileSave = dialog.NewFileSave(
 		func(writer fyne.URIWriteCloser, err error) {
@@ -193,7 +197,7 @@ func (gs *GoShot) SaveImage() {
 }
 
 func (gs *GoShot) CopyImageToClipboard() {
-	glog.V(2).Info("CopyImageToClipboard")
+	glog.V(2).Info("GoShot.CopyImageToClipboard")
 	err := clipboard.CopyImage(gs.Screenshot)
 	if err != nil {
 		glog.Errorf("Failed to copy to clipboard: %s", err)
@@ -203,6 +207,62 @@ func (gs *GoShot) CopyImageToClipboard() {
 	}
 }
 
-func shareWithGoogleDrive() {
-	fmt.Println("shareWithGoogleDrive")
+const GoogleDriveTokenPreference = "google_drive_token"
+
+func (gs *GoShot) ShareWithGoogleDrive() {
+	glog.V(0).Infof("GoShot.ShareWithGoogleDrive")
+	if gs.gdrive == nil {
+		// Create googledrive.Manager.
+		token := gs.App.Preferences().String(GoogleDriveTokenPreference)
+		var err error
+		gs.gdrive, err = googledrive.New(token,
+			func(token string) { gs.App.Preferences().SetString(GoogleDriveTokenPreference, token) },
+			gs.askForGoogleDriveAuthorization)
+		if err != nil {
+			glog.Errorf("Failed to connect to Google Drive: %s", err)
+			gs.status.SetText(fmt.Sprintf("GoogleDrive failed: %v", err))
+			return
+		}
+	}
+
+	gs.status.SetText("Connecting to GoogleDrive ...")
+
+	go func() {
+		// Sharing the image must happen in a separate goroutine because the UI must
+		// remain interactive, also in order to capture the authorization input
+		// from the user.
+		url, err := gs.gdrive.ShareImage(gs.Screenshot)
+		if err != nil {
+			glog.Errorf("Failed to share image in Google Drive: %s", err)
+			gs.status.SetText(fmt.Sprintf("GoogleDrive failed: %v", err))
+			return
+		}
+		glog.Infof("URL:\t%s", url)
+		gs.status.SetText("Image shared in GoogleDrive, URL copied to clipboard.")
+	}()
+}
+
+func (gs *GoShot) askForGoogleDriveAuthorization() string {
+	replyChan := make(chan string, 1)
+
+	// Create dialog to get the authorization from the user.
+	textEntry := widget.NewEntry()
+	textEntry.Resize(fyne.NewSize(400, 40))
+	items := []*widget.FormItem{
+		widget.NewFormItem("Authorization", textEntry),
+		widget.NewFormItem("", widget.NewLabel("Paste below the authorization given by GoogleDrive from the browser")),
+	}
+	form := dialog.NewForm("Google Drive Authorization", "Ok", "Cancel", items,
+		func(confirm bool) {
+			if confirm {
+				replyChan <- textEntry.Text
+			} else {
+				replyChan <- ""
+			}
+		}, gs.Win)
+	form.Resize(fyne.NewSize(500, 300))
+	form.Show()
+	gs.Win.Canvas().Focus(textEntry)
+
+	return <-replyChan
 }
