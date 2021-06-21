@@ -1,11 +1,14 @@
 package googledrive
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/golang/glog"
+	"google.golang.org/api/googleapi"
 	"image"
+	"image/png"
 	"net/http"
 	"os/exec"
 	"runtime"
@@ -24,9 +27,13 @@ const (
 // Manager is the object that manages Google Drive's credentials, authentication,
 // config, token, etc.
 type Manager struct {
+	path []string
+
 	jsonToken string
-	token     *oauth2.Token
 	config    *oauth2.Config
+	token     *oauth2.Token
+	client    *http.Client
+	service   *drive.Service
 
 	SetToken           func(string)
 	EnterAuthorization func() string
@@ -34,6 +41,8 @@ type Manager struct {
 
 // New creates a new Google Drive "Manager", it's the object that manages authentication, authorization
 // tokens, configs and communication with GoogleDrive.
+//
+// All files are create within the fixed given `path` (list of strings).
 //
 // A previously saved authorization `token` can be passed to reuse authorization. If none are available simply pass
 // an empty string here, and a new authorization will be requested.
@@ -48,14 +57,16 @@ type Manager struct {
 //   to paste the authorization string given by Google.
 //
 // May return an error if application credentials are wrong.
-func New(token string, setToken func(token string), enterAuthorization func() string) (*Manager, error) {
+func New(ctx context.Context, path []string, token string, setToken func(token string), enterAuthorization func() string) (*Manager, error) {
 	m := &Manager{
+		path:               path,
 		jsonToken:          token,
 		SetToken:           setToken,
 		EnterAuthorization: enterAuthorization,
 	}
 	var err error
-	m.config, err = google.ConfigFromJSON([]byte(credentialsJson), drive.DriveMetadataReadonlyScope)
+	m.config, err = google.ConfigFromJSON([]byte(credentialsJson),
+		/* Scope of authorizations: */ drive.DriveFileScope)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse client secret file to config: %w", err)
 	}
@@ -72,6 +83,16 @@ func New(token string, setToken func(token string), enterAuthorization func() st
 		}
 	}
 
+	m.client, err = m.getClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+
+	m.service, err = drive.NewService(ctx, option.WithHTTPClient(m.client))
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve GoogleDrive client: %w", err)
+	}
+
 	return m, nil
 }
 
@@ -86,17 +107,18 @@ func (m *Manager) getClient(ctx context.Context) (*http.Client, error) {
 			return nil, fmt.Errorf("failed to get authorization from the web: %w", err)
 		}
 		var b strings.Builder
-		json.NewEncoder(&b).Encode(m.token)
+		_ = json.NewEncoder(&b).Encode(m.token)
 		m.jsonToken = b.String()
 		if m.SetToken != nil {
 			m.SetToken(m.jsonToken)
 		}
 	}
-	return m.config.Client(context.Background(), m.token), nil
+	return m.config.Client(ctx, m.token), nil
 }
 
 // Request a token from the web, then returns the retrieved token.
 func (m *Manager) getTokenFromWeb() (*oauth2.Token, error) {
+	// Scope of authorization is given in the config object.
 	authURL := m.config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	if err := openurl(authURL); err != nil {
 		return nil, err
@@ -114,34 +136,96 @@ func (m *Manager) getTokenFromWeb() (*oauth2.Token, error) {
 }
 
 // ShareImage will create
-func (m *Manager) ShareImage(_ image.Image) (url string, err error) {
-	ctx := context.Background()
-
-	// If modifying these scopes, delete your previously saved token.json.
-	client, err := m.getClient(ctx)
+func (m *Manager) ShareImage(ctx context.Context, name string, img image.Image) (url string, err error) {
+	parentId, err := m.createPath(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to create HTTP client: %w", err)
+		return "", err
 	}
 
-	srv, err := drive.NewService(ctx, option.WithHTTPClient(client))
+	// Create PNG content of the image.
+	var contentBuffer bytes.Buffer
+	_ = png.Encode(&contentBuffer, img)
+	content := contentBuffer.Bytes()
+
+	f := &drive.File{
+		MimeType: "image/png",
+		Name:     name + ".png",
+		Parents:  []string{parentId},
+	}
+	f, err = m.service.Files.Create(f).
+		Context(ctx).
+		Media(bytes.NewReader(content)).
+		Do()
 	if err != nil {
-		return "", fmt.Errorf("unable to retrieve GoogleDrive client: %w", err)
+		return "", fmt.Errorf("failed to create file: %w", err)
+	}
+	glog.V(2).Infof("Returned file: %+v", f)
+
+	// Make uploaded image visible (but not writeable) to all.
+	_, err = m.service.Permissions.Create(f.Id, &drive.Permission{
+		AllowFileDiscovery: false,
+		Role:               "reader",
+		Type:               "anyone",
+		View:               "",
+		ServerResponse:     googleapi.ServerResponse{},
+		ForceSendFields:    nil,
+		NullFields:         nil,
+	}).Context(ctx).Do()
+	if err != nil {
+		return "", fmt.Errorf("failed to create shared read permissions for file name=%q id=%q: %w",
+			f.Name, f.Id, err)
 	}
 
-	r, err := srv.Files.List().PageSize(10).
-		Fields("nextPageToken, files(id, name)").Do()
+	// Get link to image.
+	f2, err := m.service.Files.Get(f.Id).Fields("webViewLink").Do()
 	if err != nil {
-		return "", fmt.Errorf("unable to retrieve GoogleDrive files: %w", err)
+		return "", fmt.Errorf("failed to get shared link to file name=%q id=%q: %w",
+			f.Name, f.Id, err)
 	}
-	fmt.Println("Files:")
-	if len(r.Files) == 0 {
-		fmt.Println("No files found.")
-	} else {
-		for _, i := range r.Files {
-			fmt.Printf("%s (%s)\n", i.Name, i.Id)
+	glog.V(2).Infof("- WebLinkView=%s", f2.WebViewLink)
+	return f2.WebViewLink, nil
+}
+
+const folderMimeType = "application/vnd.google-apps.folder"
+
+// createPath creates the path for the manager, if it doesn't yet exist.
+func (m *Manager) createPath(ctx context.Context) (id string, err error) {
+	var parents []string
+	subPath := m.path
+
+	id = "root"
+	for len(subPath) > 0 {
+		fileList, err := m.service.Files.List().
+			Q(fmt.Sprintf("mimeType = '%s' and trashed=false and '%s' in parents and name='%s'",
+				folderMimeType, id, subPath[0])).
+			Do()
+		if err != nil {
+			err = fmt.Errorf("failed to find subdirectory %q in %v: %w", subPath[0], parents, err)
+			glog.Errorf("googledrive.Manager.createPath: %v", err)
+			return "", err
 		}
+		if len(fileList.Files) == 0 {
+			f := &drive.File{
+				MimeType: folderMimeType,
+				Name:     subPath[0],
+				Parents:  []string{id},
+			}
+			f, err = m.service.Files.Create(f).
+				Context(ctx).
+				Do()
+			if err != nil {
+				glog.Warningf("Failed to create sub-folder %q in %v: %v", subPath[0], parents, err)
+			}
+			id = f.Id
+		} else {
+			// Directory found: take the first one, since GoogleDrive allows multiple files/folders with the same name.
+			id = fileList.Files[0].Id
+		}
+		glog.V(2).Infof("Path part %q: id=%q", subPath[0], id)
+		parents = append(parents, subPath[0])
+		subPath = subPath[1:]
 	}
-	return "Not implemented yet!", nil
+	return
 }
 
 func openurl(url string) error {

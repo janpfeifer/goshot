@@ -45,7 +45,7 @@ var (
 
 var (
 	Red         = color.RGBA{R: 255, G: 64, B: 64, A: 255}
-	Yellow      = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	Yellow      = color.RGBA{R: 255, G: 255, B: 64, A: 255}
 	Transparent = color.RGBA{}
 )
 
@@ -95,8 +95,12 @@ func (mm *MiniMap) updateViewPortRect() {
 		return
 	}
 
+	mm.refreshGeometry()
 	size := mm.Size()
 	screenshotW, screenshotH := wh(mm.gs.Screenshot)
+	glog.V(2).Infof("- screenshot{W,H} = (%d, %d)", screenshotW, screenshotH)
+	glog.V(2).Infof("- view{W,H} = (%d, %d)", mm.vp.viewW, mm.vp.viewH)
+	glog.V(2).Infof("- thumb{W,H} = (%d, %d)", mm.thumbW, mm.thumbH)
 	ratioX := float64(mm.vp.viewX) / float64(screenshotW)
 	ratioY := float64(mm.vp.viewY) / float64(screenshotH)
 	ratioW := float64(mm.vp.viewW) / float64(screenshotW)

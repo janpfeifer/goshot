@@ -27,12 +27,15 @@ Window macro_DefaultRootWindow(Display *dpy) { return DefaultRootWindow(dpy); }
 Atom macro_XA_CLIPBOARD(Display *dpy) { return XA_CLIPBOARD(dpy); }
 long macro_XMaxRequestSize(Display *dpy) { return XMaxRequestSize(dpy); }
 long macro_XExtendedMaxRequestSize(Display *dpy) { return XExtendedMaxRequestSize(dpy); }
+Atom macro_XA_UTF8_STRING(Display *dpy) { return XA_UTF8_STRING(dpy); }
 */
 import "C"
 
 var clipboardOnce sync.Once
 
-const ImageTarget = "image/png"
+const (
+	ImageTarget = "image/png"
+)
 
 var (
 	failure error
@@ -44,9 +47,13 @@ var (
 	atomPNGTarget, atomIncr, atomTargets C.Atom
 	targetPartSize                       int
 
+	atomTextTargets []C.Atom
+	textTargets     = []string{"text/plain;charset=utf-8", "text/plain"}
+
 	// clipboard global properties
 	hasClipboardOwnership bool
 	currentContent        []byte
+	currentContentTarget  C.Atom
 )
 
 func CopyImage(img image.Image) error {
@@ -54,15 +61,31 @@ func CopyImage(img image.Image) error {
 	png.Encode(&contentBuffer, img)
 	content := contentBuffer.Bytes()
 
-	glog.V(2).Infof("copyImageToClipboard(%d bytes)", len(content))
+	glog.V(2).Infof("CopyImage(%d bytes)", len(content))
 	clipboardOnce.Do(func() { initX11() })
 	if failure != nil {
-		glog.Errorf("copyImageToClipboard: %s", failure)
+		glog.Errorf("clipboard.CopyImage: %s", failure)
 		return failure
 	}
 
 	C.XSetSelectionOwner(display, atomClipboardSelection, window, C.CurrentTime)
 	currentContent = content
+	currentContentTarget = atomPNGTarget
+	hasClipboardOwnership = true
+	return nil
+}
+
+func CopyText(text string) error {
+	glog.V(2).Infof("CopyText(%d bytes)", len(text))
+	clipboardOnce.Do(func() { initX11() })
+	if failure != nil {
+		glog.Errorf("clipboard.CopyText: %s", failure)
+		return failure
+	}
+
+	C.XSetSelectionOwner(display, atomClipboardSelection, window, C.CurrentTime)
+	currentContent = []byte(text)
+	currentContentTarget = atomTextTargets[0]
 	hasClipboardOwnership = true
 	return nil
 }
@@ -79,6 +102,11 @@ func initX11() {
 	atomClipboardSelection = C.macro_XA_CLIPBOARD(display)
 
 	atomPNGTarget = getAtomFromName(ImageTarget)
+	atomTextTargets = make([]C.Atom, 0, len(textTargets)+1)
+	atomTextTargets = append(atomTextTargets, C.macro_XA_UTF8_STRING(display))
+	for _, tgt := range textTargets {
+		atomTextTargets = append(atomTextTargets, getAtomFromName(tgt))
+	}
 	atomIncr = getAtomFromName("INCR")
 	atomTargets = getAtomFromName("TARGETS")
 	glog.V(2).Infof("- Atom for \"image/png\" target=%+v", atomPNGTarget)
@@ -134,7 +162,7 @@ func x11EventLoop() {
 // clipboard content.
 func handleSelectionRequest(xev *C.XEvent) {
 	xevType := *(*XEventType)(unsafe.Pointer(xev))
-	var r *requestHandler
+	var r *RequestHandler
 	finished := false
 
 	switch xevType {
@@ -145,7 +173,7 @@ func handleSelectionRequest(xev *C.XEvent) {
 		var found bool
 		r, found = liveRequests[selEv.requestor]
 		if !found {
-			r = &requestHandler{
+			r = &RequestHandler{
 				win:     selEv.requestor,
 				content: currentContent,
 			}
@@ -168,13 +196,24 @@ func handleSelectionRequest(xev *C.XEvent) {
 				return // No response.
 			}
 
+			textContainsFn := func(a C.Atom) bool {
+				for _, listA := range atomTextTargets {
+					if listA == a {
+						return true
+					}
+				}
+				return false
+			}
+
 			if selEv.target == atomTargets {
 				finished = r.ReportTargets()
-			} else if selEv.target == atomPNGTarget {
+			} else if selEv.target == currentContentTarget {
+				finished = r.SendContent()
+			} else if currentContentTarget == atomTextTargets[0] && textContainsFn(selEv.target) {
 				finished = r.SendContent()
 			} else {
-				glog.Warningf("- Unknown clipboard request of type %q, only %q is supported.",
-					getNameFromAtom(selEv.target), getNameFromAtom(atomPNGTarget))
+				glog.Warningf("- Unknown clipboard request of type %q, serving target %q",
+					getNameFromAtom(selEv.target), getNameFromAtom(currentContentTarget))
 				delete(liveRequests, r.win)
 				return // No response.
 			}
@@ -213,9 +252,9 @@ func handleSelectionRequest(xev *C.XEvent) {
 	}
 }
 
-var liveRequests = make(map[C.Window]*requestHandler)
+var liveRequests = make(map[C.Window]*RequestHandler)
 
-type requestHandler struct {
+type RequestHandler struct {
 	win                         C.Window
 	content                     []byte // Copy reference since, content may change while still serving previous one.
 	position                    int
@@ -225,16 +264,20 @@ type requestHandler struct {
 }
 
 // ReportTargets reports available targets and whether request was finished.
-func (r *requestHandler) ReportTargets() bool {
-	data := [2]C.Atom{atomTargets, atomPNGTarget}
+func (r *RequestHandler) ReportTargets() bool {
+	var data = []C.Atom{atomTargets}
+	if currentContentTarget != atomTextTargets[0] {
+		data = append(data, currentContentTarget)
+	} else {
+		data = append(data, atomTextTargets...)
+	}
 	C.XChangeProperty(display, r.win, r.property, C.XA_ATOM,
 		/* format: 32 bits */ 32 /* mode */, C.PropModeReplace,
-		(*C.uchar)(unsafe.Pointer(&data)), C.int(len(data)))
-
+		(*C.uchar)(unsafe.Pointer(&data[0])), C.int(len(data)))
 	return true
 }
 
-func (r *requestHandler) SendContent() bool {
+func (r *RequestHandler) SendContent() bool {
 	if len(r.content) <= targetPartSize {
 		glog.V(2).Infof("SendContent(): %d bytes at once.", len(r.content))
 		// Send all at once.
@@ -254,7 +297,7 @@ func (r *requestHandler) SendContent() bool {
 	return false
 }
 
-func (r *requestHandler) SendContentPart() bool {
+func (r *RequestHandler) SendContentPart() bool {
 	missing := len(r.content) - r.position
 	amount := missing
 	if amount > targetPartSize {

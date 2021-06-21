@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/lxn/win"
 	"image"
 	"image/png"
 	"strings"
@@ -94,6 +93,10 @@ func CopyImage(img image.Image) error {
 	dibV5Data = 0
 	pngData = 0
 	return err
+}
+
+func CopyText(text string) error {
+	return errors.New("Clipboard text copy not implemented in Windows yet, sorry.")
 }
 
 type formatAndData struct {

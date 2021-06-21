@@ -6,6 +6,7 @@ package screenshot
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -48,7 +49,8 @@ type GoShot struct {
 	miniMap                   *MiniMap
 
 	// GoogleDrive manager
-	gdrive *googledrive.Manager
+	gDrive          *googledrive.Manager
+	gDriveNumShared int
 }
 
 type ImageFilter interface {
@@ -59,7 +61,7 @@ type ImageFilter interface {
 
 // ApplyFilters will apply `Filters` to the `CropRect` of the original image
 // and regenerate Screenshot.
-// If full == true, regenerates full Screenshot. If false, renerates only
+// If full == true, regenerates full Screenshot. If false, regenerates only
 // visible area.
 func (gs *GoShot) ApplyFilters(full bool) {
 	glog.V(2).Infof("ApplyFilters: %d filters", len(gs.Filters))
@@ -103,6 +105,8 @@ func Run() {
 	}
 	gs.BuildEditWindow()
 	gs.Win.ShowAndRun()
+	gs.miniMap.updateViewPortRect()
+	gs.miniMap.Refresh()
 }
 
 func (gs *GoShot) MakeScreenshot() error {
@@ -139,7 +143,7 @@ func (gs *GoShot) UndoLastFilter() {
 	}
 }
 
-// DefaultName retuns a default name to the screenshot, based on date/time it was made.
+// DefaultName returns a default name to the screenshot, based on date/time it was made.
 func (gs *GoShot) DefaultName() string {
 	return fmt.Sprintf("Screenshot %s",
 		gs.ScreenshotTime.Format("2006-01-02 15-04-02"))
@@ -163,14 +167,14 @@ func (gs *GoShot) SaveImage() {
 				return
 			}
 			glog.V(2).Infof("SaveImage(): URI=%s", writer.URI())
-			defer writer.Close()
+			defer func() { _ = writer.Close() }()
 
 			// Always default to previous path used:
 			defaultPath := path.Dir(writer.URI().Path())
 			gs.App.Preferences().SetString(DefaultPathPreference, defaultPath)
 
 			var contentBuffer bytes.Buffer
-			png.Encode(&contentBuffer, gs.Screenshot)
+			_ = png.Encode(&contentBuffer, gs.Screenshot)
 			content := contentBuffer.Bytes()
 			_, err = writer.Write(content)
 			if err != nil {
@@ -207,15 +211,23 @@ func (gs *GoShot) CopyImageToClipboard() {
 	}
 }
 
-const GoogleDriveTokenPreference = "google_drive_token"
+const (
+	GoogleDriveTokenPreference = "google_drive_token"
+)
+
+var (
+	GoogleDrivePath = []string{"GoShot"}
+)
 
 func (gs *GoShot) ShareWithGoogleDrive() {
-	glog.V(0).Infof("GoShot.ShareWithGoogleDrive")
-	if gs.gdrive == nil {
+	glog.V(2).Infof("GoShot.ShareWithGoogleDrive")
+	ctx := context.Background()
+
+	if gs.gDrive == nil {
 		// Create googledrive.Manager.
 		token := gs.App.Preferences().String(GoogleDriveTokenPreference)
 		var err error
-		gs.gdrive, err = googledrive.New(token,
+		gs.gDrive, err = googledrive.New(ctx, GoogleDrivePath, token,
 			func(token string) { gs.App.Preferences().SetString(GoogleDriveTokenPreference, token) },
 			gs.askForGoogleDriveAuthorization)
 		if err != nil {
@@ -226,19 +238,32 @@ func (gs *GoShot) ShareWithGoogleDrive() {
 	}
 
 	gs.status.SetText("Connecting to GoogleDrive ...")
+	fileName := gs.DefaultName()
+	gs.gDriveNumShared++
+	if gs.gDriveNumShared > 1 {
+		// In case the screenshot is shared multiple times (after different editions), we want
+		// a different name for each.
+		fileName = fmt.Sprintf("%s_%d", fileName, gs.gDriveNumShared)
+	}
 
 	go func() {
 		// Sharing the image must happen in a separate goroutine because the UI must
 		// remain interactive, also in order to capture the authorization input
 		// from the user.
-		url, err := gs.gdrive.ShareImage(gs.Screenshot)
+		url, err := gs.gDrive.ShareImage(ctx, fileName, gs.Screenshot)
 		if err != nil {
 			glog.Errorf("Failed to share image in Google Drive: %s", err)
 			gs.status.SetText(fmt.Sprintf("GoogleDrive failed: %v", err))
 			return
 		}
-		glog.Infof("URL:\t%s", url)
-		gs.status.SetText("Image shared in GoogleDrive, URL copied to clipboard.")
+		glog.Infof("GoogleDrive's shared URL:\t%s", url)
+		err = clipboard.CopyText(url)
+		if err == nil {
+			gs.status.SetText("Image shared in GoogleDrive, URL copied to clipboard.")
+		} else {
+			gs.status.SetText("Image shared in GoogleDrive, but failed to copy to clipboard, see URL and error in the logs.")
+			glog.Errorf("Failed to copy URL to clipboard: %v", err)
+		}
 	}()
 }
 
