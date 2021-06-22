@@ -223,20 +223,6 @@ func (gs *GoShot) ShareWithGoogleDrive() {
 	glog.V(2).Infof("GoShot.ShareWithGoogleDrive")
 	ctx := context.Background()
 
-	if gs.gDrive == nil {
-		// Create googledrive.Manager.
-		token := gs.App.Preferences().String(GoogleDriveTokenPreference)
-		var err error
-		gs.gDrive, err = googledrive.New(ctx, GoogleDrivePath, token,
-			func(token string) { gs.App.Preferences().SetString(GoogleDriveTokenPreference, token) },
-			gs.askForGoogleDriveAuthorization)
-		if err != nil {
-			glog.Errorf("Failed to connect to Google Drive: %s", err)
-			gs.status.SetText(fmt.Sprintf("GoogleDrive failed: %v", err))
-			return
-		}
-	}
-
 	gs.status.SetText("Connecting to GoogleDrive ...")
 	fileName := gs.DefaultName()
 	gs.gDriveNumShared++
@@ -247,6 +233,20 @@ func (gs *GoShot) ShareWithGoogleDrive() {
 	}
 
 	go func() {
+		if gs.gDrive == nil {
+			// Create googledrive.Manager.
+			token := gs.App.Preferences().String(GoogleDriveTokenPreference)
+			var err error
+			gs.gDrive, err = googledrive.New(ctx, GoogleDrivePath, token,
+				func(token string) { gs.App.Preferences().SetString(GoogleDriveTokenPreference, token) },
+				gs.askForGoogleDriveAuthorization)
+			if err != nil {
+				glog.Errorf("Failed to connect to Google Drive: %s", err)
+				gs.status.SetText(fmt.Sprintf("GoogleDrive failed: %v", err))
+				return
+			}
+		}
+
 		// Sharing the image must happen in a separate goroutine because the UI must
 		// remain interactive, also in order to capture the authorization input
 		// from the user.
