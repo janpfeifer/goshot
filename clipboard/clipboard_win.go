@@ -12,6 +12,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/lxn/win"
 )
 
 // Windows clipboard manager version: based on https://github.com/atotto/clipboard.
@@ -78,7 +80,7 @@ func CopyImage(img image.Image) error {
 	// "HTML Format"
 	html := imageToHMLEncode(img)
 	htmlCStr := C.CString(html)
-	htmlData, err := bytesToGlobalAlloc((*byte)(unsafe.Pointer(htmlCStr)), int(C.strlen(htmlCStr)))
+	htmlData, err := bytesToGlobalAlloc((*byte)(unsafe.Pointer(htmlCStr)), int(C.strlen(htmlCStr))+1)
 	C.free(unsafe.Pointer(htmlCStr))
 	if err != nil {
 		return err
@@ -96,7 +98,17 @@ func CopyImage(img image.Image) error {
 }
 
 func CopyText(text string) error {
-	return errors.New("Clipboard text copy not implemented in Windows yet, sorry.")
+	glog.V(2).Infof("CopyText(%q)", text)
+	cStr := C.CString(text)
+	textData, err := bytesToGlobalAlloc((*byte)(unsafe.Pointer(cStr)), int(C.strlen(cStr))+1)
+	C.free(unsafe.Pointer(cStr))
+	if err != nil {
+		return err
+	}
+	err = safeSetClipboardData([]formatAndData{
+		{Format: win.CF_TEXT, Data: win.HANDLE(textData)},
+	})
+	return err
 }
 
 type formatAndData struct {
