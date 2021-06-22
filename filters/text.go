@@ -100,7 +100,7 @@ func (t *Text) SetText(text string) {
 	for ii, line := range lines {
 		d.Dot = fixed.Point26_6{
 			X: fixed.Int26_6(margins * 64),
-			Y: fixed.Int26_6(((float64(ii+1) * (t.Size + float64(margins))) * 64))}
+			Y: fixed.Int26_6((float64(ii+1) * (t.Size + float64(margins))) * 64)}
 		d.DrawString(line)
 	}
 
@@ -121,12 +121,13 @@ func normalizeAlpha(img *image.RGBA) {
 	}
 	const M = 1<<8 - 1
 	maxAlpha16 := uint16(maxAlpha)
+	if maxAlpha == 0 {
+		maxAlpha = 1
+	}
 	for ii := 0; ii < len(img.Pix); ii += 4 {
 		img.Pix[ii+3] = uint8(uint16(img.Pix[ii+3]) * M / maxAlpha16)
 	}
 }
-
-var alphas = make(map[uint32]bool)
 
 // at is the function given to the filterImage object.
 func (t *Text) at(x, y int, under color.Color) color.Color {
