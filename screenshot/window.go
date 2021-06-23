@@ -29,7 +29,10 @@ func (gs *GoShot) BuildEditWindow() {
 		fyne.NewMenuItem("Copy (ctrl+c)", func() { gs.CopyImageToClipboard() }),
 		fyne.NewMenuItem("GoogleDrive (ctrl+g)", func() { gs.ShareWithGoogleDrive() }),
 	)
-	mainMenu := fyne.NewMainMenu(menuFile, menuShare)
+	menuHelp := fyne.NewMenu("Help",
+		fyne.NewMenuItem("Shortcuts (ctrl+?)", func() { gs.ShowShortcutsPage() }),
+	)
+	mainMenu := fyne.NewMainMenu(menuFile, menuShare, menuHelp)
 	gs.Win.SetMainMenu(mainMenu)
 
 	// Image canvas.
@@ -140,32 +143,7 @@ func (gs *GoShot) BuildEditWindow() {
 			gs.App.Quit()
 		})
 
-	gs.Win.Canvas().AddShortcut(
-		&fyne.ShortcutCopy{},
-		func(_ fyne.Shortcut) { gs.CopyImageToClipboard() })
-	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyC, Modifier: desktop.AltModifier},
-		func(_ fyne.Shortcut) { gs.viewPort.SetOp(DrawCircle) })
-	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyT, Modifier: desktop.AltModifier},
-		func(_ fyne.Shortcut) { gs.viewPort.SetOp(DrawText) })
-	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyA, Modifier: desktop.AltModifier},
-		func(_ fyne.Shortcut) { gs.viewPort.SetOp(DrawArrow) })
-	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyZ, Modifier: desktop.ControlModifier},
-		func(_ fyne.Shortcut) { gs.UndoLastFilter() })
-	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyS, Modifier: desktop.ControlModifier},
-		func(_ fyne.Shortcut) { gs.SaveImage() })
-	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyG, Modifier: desktop.ControlModifier},
-		func(_ fyne.Shortcut) { gs.ShareWithGoogleDrive() })
-
-	gs.Win.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
-		if ev.Name == fyne.KeyEscape {
-			if gs.viewPort.currentOperation != NoOp {
-				gs.viewPort.SetOp(NoOp)
-				gs.status.SetText("Operation cancelled.")
-			}
-		} else {
-			glog.V(2).Infof("KeyTyped: %+v", ev)
-		}
-	})
+	gs.RegisterShortcuts()
 }
 
 func (gs *GoShot) colorPicker() {

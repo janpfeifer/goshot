@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
 	"github.com/golang/glog"
@@ -47,6 +48,7 @@ type GoShot struct {
 	viewPort                  *ViewPort
 	viewPortScroll            *container.Scroll
 	miniMap                   *MiniMap
+	shortcutsDialog           dialog.Dialog
 
 	// GoogleDrive manager
 	gDrive          *googledrive.Manager
@@ -290,4 +292,97 @@ func (gs *GoShot) askForGoogleDriveAuthorization() string {
 	gs.Win.Canvas().Focus(textEntry)
 
 	return <-replyChan
+}
+
+// RegisterShortcuts adds all the shortcuts and keys GoShot
+// listens to.
+// When updating here, please update also the `gs.ShowShortcutsPage()`
+// method to reflect the changes.
+func (gs *GoShot) RegisterShortcuts() {
+	gs.Win.Canvas().AddShortcut(
+		&fyne.ShortcutCopy{},
+		func(_ fyne.Shortcut) { gs.CopyImageToClipboard() })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyJ, Modifier: desktop.AltModifier},
+		func(_ fyne.Shortcut) { gs.viewPort.SetOp(CropTopLeft) })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyK, Modifier: desktop.AltModifier},
+		func(_ fyne.Shortcut) { gs.viewPort.SetOp(CropBottomRight) })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyC, Modifier: desktop.AltModifier},
+		func(_ fyne.Shortcut) { gs.viewPort.SetOp(DrawCircle) })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyT, Modifier: desktop.AltModifier},
+		func(_ fyne.Shortcut) { gs.viewPort.SetOp(DrawText) })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyA, Modifier: desktop.AltModifier},
+		func(_ fyne.Shortcut) { gs.viewPort.SetOp(DrawArrow) })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyZ, Modifier: desktop.ControlModifier},
+		func(_ fyne.Shortcut) { gs.UndoLastFilter() })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyS, Modifier: desktop.ControlModifier},
+		func(_ fyne.Shortcut) { gs.SaveImage() })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyG, Modifier: desktop.ControlModifier},
+		func(_ fyne.Shortcut) { gs.ShareWithGoogleDrive() })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeySlash, Modifier: desktop.ControlModifier},
+		func(_ fyne.Shortcut) { gs.ShowShortcutsPage() })
+	gs.Win.Canvas().AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeySlash, Modifier: desktop.ControlModifier | desktop.ShiftModifier},
+		func(_ fyne.Shortcut) { gs.ShowShortcutsPage() })
+
+	gs.Win.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if ev.Name == fyne.KeyEscape {
+			if gs.viewPort.currentOperation != NoOp {
+				gs.viewPort.SetOp(NoOp)
+				gs.status.SetText("Operation cancelled.")
+			}
+			if gs.shortcutsDialog != nil {
+				gs.shortcutsDialog.Hide()
+			}
+		} else {
+			glog.V(2).Infof("KeyTyped: %+v", ev)
+		}
+	})
+}
+
+func (gs *GoShot) ShowShortcutsPage() {
+	if gs.shortcutsDialog == nil {
+		makeTitleFn := func(title string) (l *widget.Label) {
+			l = widget.NewLabel(title)
+			l.TextStyle.Bold = true
+			return l
+		}
+		makeDescFn := func(desc string) (l *widget.Label) {
+			l = widget.NewLabel(desc)
+			l.Alignment = fyne.TextAlignCenter
+			return l
+		}
+		makeShortcutFn := func(shortcut string) (l *widget.Label) {
+			l = widget.NewLabel(shortcut)
+			l.TextStyle.Italic = true
+			return l
+		}
+		gs.shortcutsDialog = dialog.NewCustom("GoShot Shortcuts", "Ok",
+			container.NewVScroll(container.NewVBox(
+				makeTitleFn("Image Manipulation"),
+				container.NewGridWithColumns(2,
+					makeDescFn("Crop Top-Left"), makeShortcutFn("Alt+J"),
+					makeDescFn("Crop Bottom-Right"), makeShortcutFn("Alt+K"),
+					makeDescFn("Draw Circle"), makeShortcutFn("Alt+C"),
+					makeDescFn("Draw Arrow"), makeShortcutFn("Alt+A"),
+					makeDescFn("Draw Text"), makeShortcutFn("Alt+T"),
+					makeDescFn("Cancel Operation"), makeShortcutFn("Esc"),
+					makeDescFn("Undo Last Drawing"), makeShortcutFn("Control+Z"),
+				),
+				makeTitleFn("Sharing Image"),
+				container.NewGridWithColumns(2,
+					makeDescFn("Copy Image To Clipboard"), makeShortcutFn("Control+C"),
+					makeDescFn("Save Image"), makeShortcutFn("Control+S"),
+					makeDescFn("Google Drive & Copy URL"), makeShortcutFn("Control+G"),
+				),
+				makeTitleFn("Other"),
+				container.NewGridWithColumns(2,
+					makeDescFn("Quit"), makeShortcutFn("Control+Q"),
+					makeDescFn("Shortcut page"), makeShortcutFn("Control+?"),
+				),
+			)), gs.Win)
+	}
+	size := gs.Win.Canvas().Size()
+	size.Width *= 0.90
+	size.Height *= 0.90
+	gs.shortcutsDialog.Resize(size)
+	gs.shortcutsDialog.Show()
 }
