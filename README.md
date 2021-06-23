@@ -25,15 +25,16 @@ communication tools.
 
 * For Linux and Windows only for now. (*)
 
-(*) Anyone willing to contribute with a MacOS port? Maybe in Chromebooks as well ?
+(*) Anyone willing to contribute with a macOS port? Maybe in Chromebooks as well ?
 
 ## Installation
 
 ### Windows (10)
 
-There is no installation tool yet, so one needs to download the ".exe" file and 
-place it in your favourite location. At home, I created a directory `c:\Tools` and 
-I put manually installed binaries there.
+There is no installation tool yet, so one needs to download the `goshot.zip` file from
+the [latest release](https://github.com/janpfeifer/goshot/releases), and 
+extract the `goshot.exe` file to your favourite binaries location. At home, I created a 
+directory `c:\Tools` and I put manually installed binaries there.
 
 #### Assigning to shortcut key (hotkey)
 
@@ -58,11 +59,33 @@ Create a "shortcut file", and add the --systray option.
 
 ### Linux: Gnome+Cinnamon
 
+There is no installation tool yet, so one needs to download the `goshot.tar.gz` file from
+the [latest release](https://github.com/janpfeifer/goshot/releases), and extract the binary
+`goshot` file to your personal binary directory -- I use `${HOME}/bin`. Or if you have the 
+[Go language](https://golang.org) installed, install using that instead, see below.
+
+#### Assigning to shortcut key (hotkey)
+
+It will depend on your window manager. In my Gnome/Cinnamon set up I go to "Keyboard" settings, and add
+a custom shortcut, very simple:
+
+<img src="docs/linux_keyboard_settings.png" alt="Windows Shortcut Key set up"/>
+
+#### Running in the System Tray
+
 Alternatively, run GoShot with `--systray`, to have it show up as an icon in your system tray,
 from where you can select "Screenshot" anytime (with the mouse though).
 
-### Using [Go](golang.org)
-If you have the [Go language](golang.org) installed you can also simply do:
+```shell
+$ nohup goshot --systray >& /tmp/goshot.out &
+```
+
+<img src="docs/linux_systray.png" alt="Linux SysTray icon"/>
+
+
+### Using [Go](https://golang.org) 
+
+If you have the [Go language](https://golang.org) installed you can also simply do (both Windows and Linux):
 
 ```shell
 $ go install github.com/janpfeifer/goshot@latest
@@ -92,7 +115,7 @@ Other than that, it will save and/or share images at your request.
 
 ## Known issues and feature requests:
 
-* **MacOS (Darwin)** support: I don't have access to a Mac to develop the parts not supported by [Fyne](https://github.com/fyne-io/fyne).
+* **macOS (Darwin)** support: I don't have access to a Mac to develop the parts not supported by [Fyne](https://github.com/fyne-io/fyne).
 
 * Add a **delayed time screenshot**: for those cases where one wants to screenshot things like an opened menu.
 
