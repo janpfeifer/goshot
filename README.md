@@ -23,6 +23,10 @@ communication tools.
    * Save image to a file (Control+S), to include somewhere.
    * Share image in Google Drive (Control+G) with a URL that you can paste, for instance, in a bug report.
 
+* For Linux and Windows only for now. (*)
+
+(*) Anyone willing to contribute with a MacOS port? Maybe in Chromebooks as well ?
+
 ## Configuring Global Shortcut (Hotkey)
 
 ### Windows
@@ -51,9 +55,10 @@ Other than that, it will save and/or share images at your request.
 
 * Needs better icons/design :(
 
-* Implement scrollbars on the side of the image editor: the native [Fyne](https://github.com/fyne-io/fyne) won't work.
+* Implement scrollbars on the side of the image editor: the native [Fyne](https://github.com/fyne-io/fyne) won't work. 
+  Instead, one needs to move the image around by dragging, or using the minimap.
   
-* Export to Microsoft OneDrive, DropBox, others ? -- I don't have account on those, contributions very welcome!
+* Export to Microsoft OneDrive, DropBox, others ? -- I don't have account on those, contributions are very welcome!
 
 * If running in the system tray, automatically add a global shortcut.
 
