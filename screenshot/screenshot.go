@@ -340,43 +340,43 @@ func (gs *GoShot) RegisterShortcuts() {
 
 func (gs *GoShot) ShowShortcutsPage() {
 	if gs.shortcutsDialog == nil {
-		makeTitleFn := func(title string) (l *widget.Label) {
+		titleFn := func(title string) (l *widget.Label) {
 			l = widget.NewLabel(title)
 			l.TextStyle.Bold = true
 			return l
 		}
-		makeDescFn := func(desc string) (l *widget.Label) {
+		descFn := func(desc string) (l *widget.Label) {
 			l = widget.NewLabel(desc)
 			l.Alignment = fyne.TextAlignCenter
 			return l
 		}
-		makeShortcutFn := func(shortcut string) (l *widget.Label) {
+		shortcutFn := func(shortcut string) (l *widget.Label) {
 			l = widget.NewLabel(shortcut)
 			l.TextStyle.Italic = true
 			return l
 		}
 		gs.shortcutsDialog = dialog.NewCustom("GoShot Shortcuts", "Ok",
 			container.NewVScroll(container.NewVBox(
-				makeTitleFn("Image Manipulation"),
+				titleFn("Image Manipulation"),
 				container.NewGridWithColumns(2,
-					makeDescFn("Crop Top-Left"), makeShortcutFn("Alt+J"),
-					makeDescFn("Crop Bottom-Right"), makeShortcutFn("Alt+K"),
-					makeDescFn("Draw Circle"), makeShortcutFn("Alt+C"),
-					makeDescFn("Draw Arrow"), makeShortcutFn("Alt+A"),
-					makeDescFn("Draw Text"), makeShortcutFn("Alt+T"),
-					makeDescFn("Cancel Operation"), makeShortcutFn("Esc"),
-					makeDescFn("Undo Last Drawing"), makeShortcutFn("Control+Z"),
+					descFn("Crop Top-Left"), shortcutFn("Alt+J"),
+					descFn("Crop Bottom-Right"), shortcutFn("Alt+K"),
+					descFn("Draw Circle"), shortcutFn("Alt+C"),
+					descFn("Draw Arrow"), shortcutFn("Alt+A"),
+					descFn("Draw Text"), shortcutFn("Alt+T"),
+					descFn("Cancel Operation"), shortcutFn("Esc"),
+					descFn("Undo Last Drawing"), shortcutFn("Control+Z"),
 				),
-				makeTitleFn("Sharing Image"),
+				titleFn("Sharing Image"),
 				container.NewGridWithColumns(2,
-					makeDescFn("Copy Image To Clipboard"), makeShortcutFn("Control+C"),
-					makeDescFn("Save Image"), makeShortcutFn("Control+S"),
-					makeDescFn("Google Drive & Copy URL"), makeShortcutFn("Control+G"),
+					descFn("Copy Image To Clipboard"), shortcutFn("Control+C"),
+					descFn("Save Image"), shortcutFn("Control+S"),
+					descFn("Google Drive & Copy URL"), shortcutFn("Control+G"),
 				),
-				makeTitleFn("Other"),
+				titleFn("Other"),
 				container.NewGridWithColumns(2,
-					makeDescFn("Quit"), makeShortcutFn("Control+Q"),
-					makeDescFn("Shortcut page"), makeShortcutFn("Control+?"),
+					descFn("Shortcut page"), shortcutFn("Control+?"),
+					descFn("Quit"), shortcutFn("Control+Q"),
 				),
 			)), gs.Win)
 	}
