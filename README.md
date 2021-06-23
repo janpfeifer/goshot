@@ -106,12 +106,15 @@ $ goshot --systray
 
 It is distributed under [Apache License Version 2.0](LICENSE).
 
-## Privacy
+## Privacy Policy
 
-GoShot stores in your local disk your preferences (e.g., colors, font size), and a temporary token if you are 
+GoShot stores in your local disk your preferences (e.g., colors, font size), and a temporary authorization token if you are 
 using Google Drive.
 
 Other than that, it will save and/or share images at your request.
+
+GoShot uses Google Drive exclusively when requested to store and share the screenshot images, under the `GoShot` folder. 
+The images will be visible to anyone with the URL link.
 
 ## Known issues and feature requests:
 
