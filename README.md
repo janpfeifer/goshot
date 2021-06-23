@@ -6,7 +6,9 @@ GoShot creates a screenshot of your display, which you can quickly
 crop to the area of interest, annotate (arrows, circle and text) and
 then easily share with others. 
 
-Perfect for bug/issue reports, sharing screenshots by email, WhatsApp, or any other social network or 
+<img src="docs/example1.png" alt="Annotated screenshot with GoShot"/>
+
+Made for bug/issue reports, sharing screenshots by email, WhatsApp, or any other social network or 
 communication tools.  
 
 * Assign it to a favourite hotkey (shortcut), so it's readily available.
@@ -20,10 +22,6 @@ communication tools.
      social network), document, etc.
    * Save image to a file (Control+S), to include somewhere.
    * Share image in Google Drive (Control+G) with a URL that you can paste, for instance, in a bug report.
-  
-Example:
-
-<img src="docs/example1.png" alt="Annotated screenshot with GoShot"/>
 
 ## Configuring Global Shortcut (Hotkey)
 
