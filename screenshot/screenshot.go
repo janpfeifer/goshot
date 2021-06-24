@@ -21,6 +21,7 @@ import (
 	"github.com/janpfeifer/goshot/googledrive"
 	"github.com/kbinani/screenshot"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/png"
 	"path"
@@ -149,6 +150,30 @@ func (gs *GoShot) UndoLastFilter() {
 func (gs *GoShot) DefaultName() string {
 	return fmt.Sprintf("Screenshot %s",
 		gs.ScreenshotTime.Format("2006-01-02 15-04-02"))
+}
+
+// GetColorPreference returns the color set for the given key if it has been set.
+// Otherwise it returns `defaultColor`.
+func (gs *GoShot) GetColorPreference(key string, defaultColor color.RGBA) color.RGBA {
+	isSet := gs.App.Preferences().Bool(key)
+	if !isSet {
+		return defaultColor
+	}
+	r := gs.App.Preferences().Int(key + "_R")
+	g := gs.App.Preferences().Int(key + "_G")
+	b := gs.App.Preferences().Int(key + "_B")
+	a := gs.App.Preferences().Int(key + "_A")
+	return color.RGBA{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8), A: uint8(a >> 8)}
+}
+
+// SetColorPreference sets the given color in the given preferences key.
+func (gs *GoShot) SetColorPreference(key string, c color.Color) {
+	r, g, b, a := c.RGBA()
+	gs.App.Preferences().SetInt(key+"_R", int(r))
+	gs.App.Preferences().SetInt(key+"_G", int(g))
+	gs.App.Preferences().SetInt(key+"_B", int(b))
+	gs.App.Preferences().SetInt(key+"_A", int(a))
+	gs.App.Preferences().SetBool(key, true)
 }
 
 const DefaultPathPreference = "DefaultPath"

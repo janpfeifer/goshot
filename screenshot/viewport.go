@@ -98,6 +98,14 @@ var (
 )
 
 func NewViewPort(gs *GoShot) (vp *ViewPort) {
+	prefOrFloat := func(pref string, defaultValue float64) (value float64) {
+		value = gs.App.Preferences().Float(pref)
+		if value == 0 {
+			value = defaultValue
+		}
+		return
+	}
+
 	vp = &ViewPort{
 		gs:                    gs,
 		cursorCropTopLeft:     canvas.NewImageFromResource(resources.CropTopLeft),
@@ -106,49 +114,24 @@ func NewViewPort(gs *GoShot) (vp *ViewPort) {
 		cursorDrawArrow:       canvas.NewImageFromResource(resources.DrawArrow),
 		cursorDrawText:        canvas.NewImageFromResource(resources.DrawText),
 		mouseMoveEvents:       make(chan fyne.Position, 1000),
-		Thickness:             2.0,
-		FontSize:              16.0,
+
+		FontSize:  prefOrFloat(FontSizePreference, 16*float64(gs.Win.Canvas().Scale())),
+		Thickness: prefOrFloat(ThicknessPreference, 3.0),
+
+		DrawingColor:    gs.GetColorPreference(DrawingColorPreference, Red),
+		BackgroundColor: gs.GetColorPreference(BackgroundColorPreference, Transparent),
 	}
 	go vp.consumeMouseMoveEvents()
 	vp.raster = canvas.NewRaster(vp.draw)
-	vp.FontSize *= float64(gs.Win.Canvas().Scale())
-	vp.DrawingColor = vp.GetColorPreference(DrawingColorPreference, Red)
-	vp.BackgroundColor = vp.GetColorPreference(BackgroundColorPreference, Transparent)
-	vp.Thickness = vp.gs.App.Preferences().Float(ThicknessPreference)
-	if vp.Thickness == 0 {
-		vp.Thickness = 3.0 // Default value.
-	}
 	return
 }
 
 const (
-	ThicknessPreference       = "Thickness"
-	DrawingColorPreference    = "DrawingColor"
 	BackgroundColorPreference = "BackgroundColor"
+	DrawingColorPreference    = "DrawingColor"
+	FontSizePreference        = "FontSize"
+	ThicknessPreference       = "Thickness"
 )
-
-// GetColorPreference returns the color set for the given key if it has been set.
-// Otherwise it returns `defaultColor`.
-func (vp *ViewPort) GetColorPreference(key string, defaultColor color.RGBA) color.RGBA {
-	isSet := vp.gs.App.Preferences().Bool(key)
-	if !isSet {
-		return defaultColor
-	}
-	r := vp.gs.App.Preferences().Int(key + "_R")
-	g := vp.gs.App.Preferences().Int(key + "_G")
-	b := vp.gs.App.Preferences().Int(key + "_B")
-	a := vp.gs.App.Preferences().Int(key + "_A")
-	return color.RGBA{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8), A: uint8(a >> 8)}
-}
-
-func (vp *ViewPort) SetColorPreference(key string, c color.Color) {
-	r, g, b, a := c.RGBA()
-	vp.gs.App.Preferences().SetInt(key+"_R", int(r))
-	vp.gs.App.Preferences().SetInt(key+"_G", int(g))
-	vp.gs.App.Preferences().SetInt(key+"_B", int(b))
-	vp.gs.App.Preferences().SetInt(key+"_A", int(a))
-	vp.gs.App.Preferences().SetBool(key, true)
-}
 
 func (vp *ViewPort) Resize(size fyne.Size) {
 	glog.V(2).Infof("Resize(size={w=%g, h=%g})", size.Width, size.Height)
@@ -658,7 +641,7 @@ func (vp *ViewPort) createTextFilter(center image.Point) {
 		"Pick a Color", "Select background color for text",
 		func(c color.Color) {
 			vp.BackgroundColor = c
-			vp.SetColorPreference(BackgroundColorPreference, c)
+			vp.gs.SetColorPreference(BackgroundColorPreference, c)
 			bgColorRect.FillColor = vp.BackgroundColor
 			bgColorRect.Refresh()
 			form.Refresh()
@@ -683,14 +666,15 @@ func (vp *ViewPort) createTextFilter(center image.Point) {
 	form = dialog.NewForm("Insert text", "Ok", "Cancel", items,
 		func(confirm bool) {
 			if confirm {
-				size, err := strconv.ParseFloat(fontSize.Text, 64)
+				fSize, err := strconv.ParseFloat(fontSize.Text, 64)
 				if err != nil {
 					glog.Errorf("Error parsing the font size given: %q", fontSize.Text)
 					vp.gs.status.SetText(fmt.Sprintf("Error parsing the font size given: %q", fontSize.Text))
 					return
 				}
-				vp.FontSize = size
-				textFilter := filters.NewText(textEntry.Text, center, vp.DrawingColor, vp.BackgroundColor, size)
+				vp.FontSize = fSize
+				vp.gs.App.Preferences().SetFloat(FontSizePreference, fSize)
+				textFilter := filters.NewText(textEntry.Text, center, vp.DrawingColor, vp.BackgroundColor, fSize)
 				vp.gs.Filters = append(vp.gs.Filters, textFilter)
 				vp.gs.ApplyFilters(true)
 				vp.gs.status.SetText("Text drawn, use Control+Z to undo.")

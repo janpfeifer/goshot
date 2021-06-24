@@ -152,7 +152,7 @@ func (gs *GoShot) colorPicker() {
 		"Pick a Color", "Select color for edits",
 		func(c color.Color) {
 			gs.viewPort.DrawingColor = c
-			gs.viewPort.SetColorPreference(DrawingColorPreference, c)
+			gs.SetColorPreference(DrawingColorPreference, c)
 			gs.colorSample.FillColor = c
 			gs.colorSample.Refresh()
 		},
