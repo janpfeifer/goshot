@@ -39,8 +39,7 @@ directory `c:\Tools` and I put manually installed binaries there.
 #### Assigning to shortcut key (hotkey)
 
 In Windows 10 a *shortcut key* can be easily assigned to a "shortcut file" **in the Desktop**. 
-Elsewhere, it doesn't seem to work ... despite Windows allowing to set the shortcut, not sure what 
-was the logic the engineers had in their mind here.
+Elsewhere, it doesn't seem to work.
 
 Right-click on the desktop, create a shortcut and point it to where you installed your GoShot `.exe`
 file. Then right-click on the "shortcut file", in the Desktop, and assign a "shortcut key", which can
@@ -85,13 +84,19 @@ $ nohup goshot --systray >& /tmp/goshot.out &
 
 ### Using [Go](https://golang.org) 
 
-If you have the [Go language](https://golang.org) installed you can also simply do (both Windows and Linux):
+If you have the [Go language](https://golang.org) installed you can also simply do in Linux:
 
 ```shell
 $ go install github.com/janpfeifer/goshot@latest
 ```
 
-It will compile (take a couple of minutes) and show up in your Go directory.
+In Windows, you have to add a flag to tell it not to open the program in a terminal (cmd.exe):
+
+```shell
+$ go install -ldflags="-H windowsgui" github.com/janpfeifer/goshot@latest
+```
+
+In both cases it will compile (take a couple of minutes) and show up in your Go directory.
 
 ### Running in the System Tray
 
