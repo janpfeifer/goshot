@@ -633,7 +633,7 @@ func (vp *ViewPort) createTextFilter(center image.Point) {
 	textEntry := widget.NewMultiLineEntry()
 	textEntry.Resize(fyne.NewSize(400, 80))
 	fontSize := widget.NewEntry()
-	fontSize.SetText(fmt.Sprintf("%f", vp.FontSize))
+	fontSize.SetText(fmt.Sprintf("%g", vp.FontSize))
 	fontSize.Validator = validation.NewRegexp(`\d`, "Must contain a number")
 	bgColorRect := canvas.NewRectangle(vp.BackgroundColor)
 	bgColorRect.SetMinSize(fyne.NewSize(200, 20))

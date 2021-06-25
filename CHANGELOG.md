@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.1 (WIP)
+## 0.1.1
 
 * Added -ldconfig="-H windowsgui" for windows to removed annoying terminal window.
 * Saved font size in preferences.
