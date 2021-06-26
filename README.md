@@ -21,7 +21,8 @@ communication tools.
    * Copy annotated image to clipboard (Control+C): and then paste into your email, WhatsApp (or other messenger / 
      social network), document, etc.
    * Save image to a file (Control+S), to include somewhere.
-   * Share image in Google Drive (Control+G) with a URL that you can paste, for instance, in a bug report.
+   * Share image in Google Drive (Control+G) and have the URL copied, so that you can paste it, for instance, in a 
+     bug report.
 
 * For Linux and Windows only for now. (*)
 
