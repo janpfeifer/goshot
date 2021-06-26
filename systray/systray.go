@@ -5,7 +5,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/janpfeifer/goshot/resources"
 	"os/exec"
-	"strings"
+	"time"
 )
 
 const appIconResID = 7
@@ -31,7 +31,12 @@ func onReady() {
 	glst.SetTooltip("Take screenshot, edit and share!")
 
 	mScreenshot := glst.AddMenuItem("Screenshot", "Take screenshot, edit and share!")
+	mScreenshotIn5 := glst.AddMenuItem("Screenshot in 5s", "Take screenshot in 5 seconds")
 	go handler(mScreenshot, onScreenshot)
+	go handler(mScreenshotIn5, func() {
+		time.Sleep(5 * time.Second)
+		onScreenshot()
+	})
 	mQuit := glst.AddMenuItem("Quit", "Quit the whole app")
 	go func() { <-mQuit.ClickedCh; glst.Quit() }()
 }
@@ -51,9 +56,10 @@ func handler(item *glst.MenuItem, onClick func()) {
 }
 
 func onScreenshot() {
+	glog.V(2).Infof("Args: %v", PreParseArgs)
 	args := make([]string, 0, len(PreParseArgs))
 	for _, arg := range PreParseArgs {
-		if strings.Contains(arg, "systray") {
+		if arg == "--systray" || arg == "-systray" {
 			// Remove the -systray flag.
 			continue
 		}
