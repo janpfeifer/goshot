@@ -33,7 +33,7 @@ communication tools.
 ### Windows (10)
 
 There is no installation tool yet, so one needs to download the `goshot-win.zip` file from
-the [latest release](https://github.com/janpfeifer/goshot/releases/download/v0.1.1/goshot-win.zip), and 
+the [latest release](https://github.com/janpfeifer/goshot/releases/download/v0.1.2/goshot-win.zip), and 
 extract the `goshot.exe` file to your favourite binaries location. At home, I created a 
 directory `c:\Tools` and I put manually installed binaries there.
 
@@ -60,9 +60,9 @@ Create a "shortcut file", and add the --systray option.
 ### Linux: Gnome+Cinnamon
 
 There is no installation tool yet, so one needs to download the `goshot.tar.gz` file from
-the [latest release](https://github.com/janpfeifer/goshot/releases/download/v0.1.1/goshot.tar.gz),
-and extract the binary `goshot` file to your personal binary directory -- I use `${HOME}/bin`. Or if you have the 
-[Go language](https://golang.org) installed, install using that instead, see below.
+the [latest release](https://github.com/janpfeifer/goshot/releases/download/v0.1.2/goshot-linux.tar.gz) (amd64 version
+only so far), and extract the binary `goshot` file to your personal binary directory -- I use `${HOME}/bin`. Or if you
+have the [Go language](https://golang.org) installed, install using that instead, see below.
 
 #### Assigning to shortcut key (hotkey)
 
