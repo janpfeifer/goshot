@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+* Added "screenshot in 5 seconds" option to systray.
+
 ## 0.1.1
 
 * Added -ldconfig="-H windowsgui" for windows to removed annoying terminal window.
