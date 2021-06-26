@@ -13,8 +13,8 @@ communication tools.
 
 * Assign it to a favourite hotkey (shortcut), so it's readily available.
 
-* Run it to capture a screenshot, which you can easily crop to the area of interest.
-
+* Run it to capture a screenshot, which you can easily crop to the area of interest. It can also capture delayed
+  screenshots: handy when one wants to screenshot opened menus. 
 * **Annotate**: circles, arrows and text of different sizes and colors.
 
 * **Share**:
