@@ -3,6 +3,7 @@
 ## 0.1.2
 
 * Added "screenshot in 5 seconds" option to systray.
+* Added "Delayed Screenshot" menu option in GoShot, with arbitrary delay.
 
 ## 0.1.1
 

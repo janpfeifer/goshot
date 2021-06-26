@@ -23,6 +23,7 @@ func (gs *GoShot) BuildEditWindow() {
 	// Build menu.
 	menuFile := fyne.NewMenu("File",
 		fyne.NewMenuItem("Save (ctrl+s)", func() { gs.SaveImage() }),
+		fyne.NewMenuItem("Delayed screenshot", func() { gs.DelayedScreenshotForm() }),
 	) // Quit is added automatically.
 
 	menuShare := fyne.NewMenu("Share",

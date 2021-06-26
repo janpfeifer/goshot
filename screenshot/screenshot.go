@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/validation"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/storage"
@@ -25,6 +26,7 @@ import (
 	"image/draw"
 	"image/png"
 	"path"
+	"strconv"
 	"time"
 )
 
@@ -49,7 +51,9 @@ type GoShot struct {
 	viewPort                  *ViewPort
 	viewPortScroll            *container.Scroll
 	miniMap                   *MiniMap
-	shortcutsDialog           dialog.Dialog
+
+	shortcutsDialog         dialog.Dialog
+	delayedScreenshotDialog dialog.Dialog
 
 	// GoogleDrive manager
 	gDrive          *googledrive.Manager
@@ -129,13 +133,6 @@ func (gs *GoShot) MakeScreenshot() error {
 
 	glog.V(2).Infof("Screenshot captured bounds: %+v\n", bounds)
 	return nil
-	//
-	//fileName := fmt.Sprintf("%d_%dx%d.png", i, bounds.Dx(), bounds.Dy())
-	//file, _ := os.Create(fileName)
-	//defer file.Close()
-	//png.Encode(file, img)
-	//
-	//fmt.Printf("#%d : %v \"%s\"\n", i, bounds, fileName)
 }
 
 // UndoLastFilter cancels the last filter applied, and regenerates everything.
@@ -410,4 +407,64 @@ func (gs *GoShot) ShowShortcutsPage() {
 	size.Height *= 0.90
 	gs.shortcutsDialog.Resize(size)
 	gs.shortcutsDialog.Show()
+}
+
+const DelayTimePreference = "DelayTime"
+
+func (gs *GoShot) DelayedScreenshotForm() {
+	if gs.delayedScreenshotDialog == nil {
+		delayEntry := widget.NewEntry()
+		delayEntry.Validator = validation.NewRegexp(`\d`, "Must contain a number")
+		v := gs.App.Preferences().Int(DelayTimePreference)
+		if v == 0 {
+			v = 5
+		}
+		delayEntry.SetText(strconv.FormatInt(int64(v), 10))
+		gs.delayedScreenshotDialog = dialog.NewForm(
+			"Delayed Screenshot",
+			"Ok", "Cancel",
+			[]*widget.FormItem{
+				widget.NewFormItem("Screenshot after (seconds)",
+					delayEntry),
+			}, func(ok bool) {
+				if ok {
+					secs, err := strconv.ParseInt(delayEntry.Text, 10, 64)
+					if err != nil {
+						gs.status.SetText(fmt.Sprintf("Can't parse seconds in delay from %q: %s",
+							delayEntry.Text, err))
+						glog.Errorf("Can't parse seconds in delay from %q: %s",
+							delayEntry.Text, err)
+						return
+					}
+					gs.App.Preferences().SetInt(DelayTimePreference, int(secs))
+					gs.DelayedScreenshot(int(secs))
+				}
+			}, gs.Win)
+	}
+	size := gs.Win.Canvas().Size()
+	size.Width *= 0.90
+	size.Height *= 0.90
+	gs.delayedScreenshotDialog.Resize(size)
+	gs.delayedScreenshotDialog.Show()
+}
+
+func (gs *GoShot) DelayedScreenshot(seconds int) {
+	glog.V(2).Infof("DelayedScreenshot(%d secs)", seconds)
+	go func() {
+		for seconds > 0 {
+			gs.status.SetText(fmt.Sprintf("Screenshot in %d seconds ...", seconds))
+			time.Sleep(time.Second)
+			seconds--
+		}
+		err := gs.MakeScreenshot()
+		if err == nil {
+			gs.status.SetText("New screenshot!")
+		} else {
+			glog.Errorf("Failed to create new screenshot: %v", err)
+			gs.status.SetText(fmt.Sprintf("Failed to create new screenshot: %v", err))
+		}
+		gs.miniMap.updateViewPortRect()
+		gs.viewPort.Refresh()
+		gs.miniMap.Refresh()
+	}()
 }

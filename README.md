@@ -125,9 +125,6 @@ The images will be visible to anyone with the URL link.
 
 * **macOS (Darwin)** support: I don't have access to a Mac to develop the parts not supported by [Fyne](https://github.com/fyne-io/fyne).
 
-* Add a **delayed time screenshot**: for those cases
-  where one wants to screenshot things like an opened menu.
-
 * Needs **better icons** and design -- I'm terrible at those :(
 
 * Implement scrollbars on the side of the image editor: the native [Fyne](https://github.com/fyne-io/fyne) won't work. 
