@@ -1,4 +1,5 @@
-//+build windows
+//go:build windows
+// +build windows
 
 package clipboard
 
@@ -12,8 +13,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/lxn/win"
 )
 
 // Windows clipboard manager version: based on https://github.com/atotto/clipboard.

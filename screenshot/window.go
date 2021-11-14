@@ -22,13 +22,13 @@ func (gs *GoShot) BuildEditWindow() {
 
 	// Build menu.
 	menuFile := fyne.NewMenu("File",
-		fyne.NewMenuItem("Save (ctrl+s)", func() { gs.SaveImage() }),
+		fyne.NewMenuItem(fmt.Sprintf("Save (%s)", SaveShortcutDesc), func() { gs.SaveImage() }),
 		fyne.NewMenuItem("Delayed screenshot", func() { gs.DelayedScreenshotForm() }),
 	) // Quit is added automatically.
 
 	menuShare := fyne.NewMenu("Share",
-		fyne.NewMenuItem("Copy (ctrl+c)", func() { gs.CopyImageToClipboard() }),
-		fyne.NewMenuItem("GoogleDrive (ctrl+g)", func() { gs.ShareWithGoogleDrive() }),
+		fyne.NewMenuItem(fmt.Sprintf("Copy (%s)", CopyShortcutDesc), func() { gs.CopyImageToClipboard() }),
+		fyne.NewMenuItem(fmt.Sprintf("GoogleDrive (%s)", DriveShortcutDesc), func() { gs.ShareWithGoogleDrive() }),
 	)
 	menuHelp := fyne.NewMenu("Help",
 		fyne.NewMenuItem("Shortcuts (ctrl+?)", func() { gs.ShowShortcutsPage() }),
