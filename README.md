@@ -124,7 +124,7 @@ The images will be visible to anyone with the URL link.
 
 ## Known issues and feature requests:
 
-* **macOS (Darwin)** support: I don't have access to a Mac to develop the parts not supported by [Fyne](https://github.com/fyne-io/fyne).
+* **macOS (Darwin)** support: Clipboard code was contributed (thanks @mattbucci!). But I don't have access to a Mac to develop/maintain/build releases, so one will need to install using `go install`.
 
 * Needs **better icons** and design -- I'm terrible at those :(
 
