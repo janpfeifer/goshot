@@ -16,6 +16,7 @@ import (
 // Clipboard handling in Linux/X11.
 
 /*
+#cgo pkg-config: xmu x11
 #cgo LDFLAGS: -lX11 -lXmu
 #include <stdio.h>
 #include <stdlib.h>

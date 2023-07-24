@@ -27,7 +27,7 @@ func Run() {
 
 func onReady() {
 	glst.SetIcon(resources.GoShotIconIco.Content())
-	glst.SetTitle("GoShot (SysTray)")
+	// glst.SetTitle("GoShot (SysTray)")
 	glst.SetTooltip("Take screenshot, edit and share!")
 
 	mScreenshot := glst.AddMenuItem("Screenshot", "Take screenshot, edit and share!")
